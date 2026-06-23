@@ -71,7 +71,7 @@ Telegram-бот для автоматического комментирован
 - Python 3.10+
 - Аккаунт на [my.telegram.org](https://my.telegram.org) для получения API_ID и API_HASH
 - Telegram-бот созданный через [@BotFather](https://t.me/BotFather)
-- Аккаунт на [agent.timeweb.cloud](https://agent.timeweb.cloud) для доступа к ИИ
+- Аккаунт на [timeweb.cloud](https://timeweb.cloud/services/ai-agents) для доступа к ИИ (раздел AI Agents)
 
 ---
 
@@ -126,7 +126,7 @@ pip install "git+https://github.com/KurimuzonAkuma/pyrogram/archive/dev.zip"
 
 ### 8. Получи Timeweb AI credentials
 
-Зарегистрируйся на [agent.timeweb.cloud](https://agent.timeweb.cloud):
+Зарегистрируйся на [timeweb.cloud/services/ai-agents](https://timeweb.cloud/services/ai-agents):
 - Создай AI-агента и скопируй **Agent Access ID** (`TIMEWEB_AGENT_ID`)
 - В настройках профиля создай **Bearer-токен** (`TIMEWEB_TOKEN`)
 
@@ -240,7 +240,6 @@ ComBot/
 
 **Ошибка при добавлении аккаунта**
 - Номер должен быть в международном формате: `+79001234567`
-- Если аккаунт уже залогинен где-то — сначала завершите другие сессии
 
 **Как добавить несколько администраторов**
 - В `config.py` в поле `ADMINS` перечисли ID через запятую: `ADMINS = (111111111, 222222222)`
