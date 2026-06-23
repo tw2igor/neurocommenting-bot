@@ -1307,12 +1307,13 @@ def setup_manager(app):
                         
                         try:
                             res = await client.join_chat(channel)
+                            chat_id = res.id if hasattr(res, 'id') else res.chat.id
                             sql_edit(
-                                f"INSERT INTO channels VALUES(?, '{data.split()[1]}', '{data.split()[2]}')", (res.id,))
+                                f"INSERT INTO channels VALUES(?, '{data.split()[1]}', '{data.split()[2]}')", (chat_id,))
                             success += 1
-                            
-                            async for message in client.get_chat_history(res.id, limit=1, offset_id=-1):
-                                dmsg = await client.get_discussion_message(res.id, message.id)
+
+                            async for message in client.get_chat_history(chat_id, limit=1, offset_id=-1):
+                                dmsg = await client.get_discussion_message(chat_id, message.id)
                                 try:
                                     msg = await dmsg.reply('👍')
                                     await msg.delete()
