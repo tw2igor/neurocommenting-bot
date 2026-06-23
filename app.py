@@ -727,7 +727,7 @@ def setup_manager(app):
                 
                 
                 reply_text = (
-                    f'<b>{client_data.mention}</b> @{client_data.username}:\n\n'
+                    f'<b>{client_data.first_name}</b> @{client_data.username}:\n\n'
                     f'⭐ Премиум: {client_data.is_premium}\n'
                     f'🚫 Ограничения: {client_data.is_restricted}\n\n'
                     f'🤖 Роль: <code>{settings[0][2]}</code>\n'
@@ -744,7 +744,7 @@ def setup_manager(app):
                         f'Задержка - {settings[0][4]} ⌛', callback_data=f'set delay {client_data.phone_number}'),
                      InlineKeyboardButton(
                          f'Шанс коммента - {settings[0][5]} 🎲', callback_data=f'set chance {client_data.phone_number}')])
-                keyboard.append([InlineKeyboardButton('Профиль ⛓️', user_id=client_data.id),
+                keyboard.append([InlineKeyboardButton('Профиль ⛓️', url=f'tg://user?id={client_data.id}'),
                                  InlineKeyboardButton('✏️', callback_data=f'change {client_data.phone_number}')])
                 keyboard.append(
                     [InlineKeyboardButton('Добавить каналы 💬', callback_data=f'newchannels {client_data.phone_number} comments'),
@@ -783,61 +783,7 @@ def setup_manager(app):
                 
                 keyboard.append([InlineKeyboardButton('Все Аккаунты ◀️', callback_data='accounts')])
                 
-                try:
-                    await callback_query.message.edit(reply_text, reply_markup=InlineKeyboardMarkup(keyboard))
-                except PeerIdInvalid:
-                    keyboard = []
-                    
-                    keyboard.append(
-                        [InlineKeyboardButton('Промпт 🤖',
-                                              callback_data=f'set what_to_write {client_data.phone_number}')])
-                    keyboard.append(
-                        [InlineKeyboardButton('Роль 🤖', callback_data=f'set prompt {client_data.phone_number}'),
-                         InlineKeyboardButton('Автоответ 👩‍🎓',
-                                              callback_data=f'set auto_reply {client_data.phone_number}')])
-                    keyboard.append(
-                        [InlineKeyboardButton(f'Задержка - {settings[0][4]} ⌛',
-                                              callback_data=f'set delay {client_data.phone_number}'),
-                         InlineKeyboardButton(f'Шанс коммента - {settings[0][5]} 🎲',
-                                              callback_data=f'set chance {client_data.phone_number}')])
-                    keyboard.append([InlineKeyboardButton('Профиль ⛓️', url=f'tg://user?id={client_data.id}'),
-                                     InlineKeyboardButton('✏️', callback_data=f'change {client_data.phone_number}')])
-                    keyboard.append(
-                        [InlineKeyboardButton('Добавить каналы 💬', callback_data=f'newchannels {client_data.phone_number} comments'),
-                         InlineKeyboardButton('Удалить аккаунт ❌', callback_data=f'del {client_data.phone_number}')])
-                    
-                    keyboard.append(
-                        [InlineKeyboardButton(f'Комментировать первым {be_first}',
-                                              callback_data=f'switchbefirst {client_data.phone_number}')])
-
-                    if settings[0][9] == 1:
-                        use_gpt = '✅'
-                    else:
-                        use_gpt = '❌'
-
-                    keyboard.append(
-                        [InlineKeyboardButton(f'Комментировать шаблонами {use_gpt}',
-                                              callback_data=f'switchgpt {client_data.phone_number}')])
-
-
-                    if settings[0][6] == 1:
-                        keyboard.append(
-                            [InlineKeyboardButton(f'Тексты первого коммента',
-                                                  callback_data=f'editpretexts {client_data.phone_number}')])
-                    
-                    keyboard.append(
-                        [InlineKeyboardButton('Список каналов 🧿',
-                                              callback_data=f'allchannels {client_data.phone_number}')])
-                    keyboard.append(
-                        [InlineKeyboardButton('Инвайтинг 🦁',
-                                              callback_data=f'inviting {client_data.phone_number}')])
-                    keyboard.append(
-                        [InlineKeyboardButton('Рассылка по лс 🌪',
-                                              callback_data=f'spam_dms {client_data.phone_number}')])
-
-                    keyboard.append([InlineKeyboardButton('Все аккаунты ◀️', callback_data='accounts')])
-                    
-                    await callback_query.message.edit(reply_text, reply_markup=InlineKeyboardMarkup(keyboard))
+                await callback_query.message.edit(reply_text, reply_markup=InlineKeyboardMarkup(keyboard))
                     
 
             except Exception as e:
@@ -1468,7 +1414,7 @@ def setup_manager(app):
                     [InlineKeyboardButton('Описание', callback_data=f'update about {client_data.phone_number}'),
                      InlineKeyboardButton('Фамилия', callback_data=f'update last_name {client_data.phone_number}')],
                     [InlineKeyboardButton('Юзернейм', callback_data=f'update username {client_data.phone_number}')],
-                    [InlineKeyboardButton('Профиль ⛓️', user_id=client_data.id)],
+                    [InlineKeyboardButton('Профиль ⛓️', url=f'tg://user?id={client_data.id}')],
                     [InlineKeyboardButton('Назад ◀️', callback_data=f'user {client_data.phone_number}')]]))
             except PeerIdInvalid:
                 await callback_query.message.edit(data_text, reply_markup=InlineKeyboardMarkup([
@@ -1516,7 +1462,7 @@ def setup_manager(app):
                         [InlineKeyboardButton('Описание', callback_data=f'update about {client_data.phone_number}'),
                          InlineKeyboardButton('Фамилия', callback_data=f'update last_name {client_data.phone_number}')],
                         [InlineKeyboardButton('Юзернейм', callback_data=f'update username {client_data.phone_number}')],
-                        [InlineKeyboardButton('Профиль ⛓️', user_id=client_data.id)],
+                        [InlineKeyboardButton('Профиль ⛓️', url=f'tg://user?id={client_data.id}')],
                         [InlineKeyboardButton('Назад ◀️', callback_data=f'user {client_data.phone_number}')]]))
                 except PeerIdInvalid:
                     await callback_query.message.edit(data_text, reply_markup=InlineKeyboardMarkup([
