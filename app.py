@@ -2323,6 +2323,71 @@ def setup_worker(app):
                                 f'<b>Ошибка при комментарии в {channel_message.chat.title}</b>\n\n'
                                 f'{e}')
     
+    @app.on_message(filters.group, group=3)
+    async def comment_group(_, message):
+
+        global SENT_TODAY
+        if not (message.text or message.caption):
+            return
+
+        client_data = await app.get_me()
+        channels = sql_select(f"SELECT purpose, session FROM channels WHERE session = '{client_data.phone_number}' "
+                              f'and id = {message.chat.id}')
+
+        if not channels:
+            return
+
+        settings = sql_select(f"SELECT * FROM workers WHERE session = '{client_data.phone_number}'")
+
+        await asyncio.sleep(settings[0][4])
+
+        if random.randint(1, settings[0][5]) != 1 or SENT_TODAY >= LIMIT:
+            return
+
+        service_channel = sql_select('SELECT channel FROM managers')
+        post = message.caption if message.caption else message.text
+
+        try:
+            if settings[0][9] == 1:
+                pretexts = sql_select(f"SELECT text FROM pretexts WHERE session = '{client_data.phone_number}'")
+                if pretexts:
+                    await message.reply(random.choice(pretexts)[0])
+                else:
+                    await message.reply(random.choice(emojies))
+                return
+
+            if settings[0][6] == 1:
+                pretexts = sql_select(f"SELECT text FROM pretexts WHERE session = '{client_data.phone_number}'")
+                if pretexts:
+                    sent_message = await message.reply(random.choice(pretexts)[0])
+                else:
+                    sent_message = await message.reply(random.choice(emojies))
+            else:
+                sent_message = None
+
+            prompt = settings[0][7] + f' "{post}"'
+            output = await generate_response(prompt, settings[0][2], app)
+
+            if sent_message:
+                reply = await sent_message.edit(output)
+            else:
+                reply = await message.reply(output)
+
+            SENT_TODAY += 1
+
+            if service_channel:
+                await manager_apps[0].send_message(
+                    service_channel[0][0],
+                    f'<b>Новый комментарий в {message.chat.title}</b>\n\n'
+                    f'{reply.link}')
+
+        except Exception as e:
+            if service_channel:
+                await manager_apps[0].send_message(
+                    service_channel[0][0],
+                    f'<b>Ошибка при комментарии в {message.chat.title}</b>\n\n'
+                    f'{e}')
+
     @app.on_message(filters.private)
     async def comment(_, message):
 
