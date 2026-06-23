@@ -787,15 +787,7 @@ def setup_manager(app):
                     
 
             except Exception as e:
-                phone_from_cb = data.split(' ', 1)[1] if ' ' in data else '?'
-                all_sessions = sql_select("SELECT session FROM workers")
-                await callback_query.message.reply(
-                    f'data repr: {data!r}\n'
-                    f'phone from callback: {phone_from_cb!r}\n'
-                    f'DB sessions: {all_sessions}\n'
-                    f'workers_list keys: {list(workers_list.keys())}\n\n'
-                    f'{e}'
-                )
+                await callback_query.message.reply(f'😛 Произошла ошибка\n\n<pre>{e}</pre>')
                 
         elif data.startswith('allchannels'):
             channels = sql_select(f"SELECT id FROM channels WHERE session = '{data.split()[1]}'")
@@ -1100,7 +1092,10 @@ def setup_manager(app):
                 async def wait2(people_list):
 
                     await remove_handler(people_list.from_user.id)
-                    await app.delete_messages(people_list.from_user.id, people_list.id)
+                    try:
+                        await app.delete_messages(people_list.from_user.id, people_list.id)
+                    except Exception:
+                        pass
 
                     await callback_query.message.reply(
                         'С каким промежутком добавлть людей? Для рандомного выбора напишите промежуток в таком формате: 1-5 (от 1й до 5ти сек)',
@@ -1278,10 +1273,13 @@ def setup_manager(app):
                 await callback_query.message.edit('🌴 Введите список каналов, каждый канал с новой строчки:')
                 
                 async def wait(message):
-                    
+
                     await remove_handler(message.from_user.id)
-                    await app.delete_messages(message.from_user.id, message.id)
-                    
+                    try:
+                        await app.delete_messages(message.from_user.id, message.id)
+                    except Exception:
+                        pass
+
                     channels = message.text.split('\n')
                     
                     client = workers_list[data.split()[1]]
@@ -1373,7 +1371,10 @@ def setup_manager(app):
             async def wait(message):
 
                 await remove_handler(message.from_user.id)
-                await app.delete_messages(message.from_user.id, message.id)
+                try:
+                    await app.delete_messages(message.from_user.id, message.id)
+                except Exception:
+                    pass
 
                 pretexts = message.text.split('\n')
 
@@ -1579,14 +1580,16 @@ def setup_manager(app):
             await add_handler(callback_query.from_user.id, functions[args[1]][1])
         
         elif data.startswith('confirmset auto_reply'):
+            await callback_query.message.edit(
+                '<b>Введите новый текст для автоответчика:</b>\n\n'
+                'Можете написать что угодно. Например, предложение подписаться на ваш канал')
+
             async def wait(info):
-                
-                await callback_query.message.edit(
-                    '<b>Введите новый текст для автоответчика:</b>\n\n'
-                    'Можете написать что угодно. Например, предложение подписаться на ваш канал')
-                
-                await app.delete_messages(info.chat.id, info.id)
-                
+                try:
+                    await app.delete_messages(info.chat.id, info.id)
+                except Exception:
+                    pass
+
                 try:
                     await remove_handler(callback_query.from_user.id)
                     sql_edit(f"UPDATE workers SET {data.split(' ', 2)[1]} = ? "
@@ -1595,11 +1598,11 @@ def setup_manager(app):
                     await callback_query.message.edit('👍 Данные обновлены')
                     await asyncio.sleep(2)
                     await menu(callback_query.message)
-                
+
                 except Exception as e:
-                    await callback_query.message.edit(info.from_user.id, f'😛 Произошла ошибка\n\n<pre>{e}</pre>')
+                    await callback_query.message.edit(f'😛 Произошла ошибка\n\n<pre>{e}</pre>')
                     await remove_handler(callback_query.from_user.id)
-            
+
             await add_handler(callback_query.from_user.id, wait)
         
         elif data.startswith('no auto_reply'):
@@ -1645,9 +1648,11 @@ def setup_manager(app):
                                                   'Если хотите 100%, введите 1 (1к<b>1</b>)')
             
             async def wait(info):
-                
-                await app.delete_messages(info.chat.id, info.id)
-                
+                try:
+                    await app.delete_messages(info.chat.id, info.id)
+                except Exception:
+                    pass
+
                 try:
                     await remove_handler(callback_query.from_user.id)
                     sql_edit(f"UPDATE workers SET {data.split(' ', 2)[1]} = ? "
@@ -1657,15 +1662,15 @@ def setup_manager(app):
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton('Назад к аккаунту ◀️',
                                                   callback_data='user ' + data.split(" ", 2)[2])]]))
-                
+
                 except Exception as e:
                     await callback_query.message.edit(
-                        info.from_user.id, f'😛 Произошла ошибка\n\n<pre>{e}</pre>',
+                        f'😛 Произошла ошибка\n\n<pre>{e}</pre>',
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton('Назад к аккаунту ◀️',
                                                   callback_data='user ' + data.split(" ", 2)[2])]]))
                     await remove_handler(callback_query.from_user.id)
-            
+
             await add_handler(callback_query.from_user.id, wait)
 
         elif data.startswith('bot'):
@@ -1676,11 +1681,14 @@ def setup_manager(app):
                                           reply_markup=ReplyKeyboardMarkup([['Отмена ❌']], resize_keyboard=True))
             
             async def wait(token):
-                
+
                 await remove_handler(callback_query.from_user.id)
-                await app.delete_messages(token.chat.id, token.id)
-                await app.delete_messages(sent.chat.id, sent.id)
-                
+                try:
+                    await app.delete_messages(token.chat.id, token.id)
+                    await app.delete_messages(sent.chat.id, sent.id)
+                except Exception:
+                    pass
+
                 if token.text == 'Отмена ❌':
                     
                     sent2 = await app.send_message(callback_query.from_user.id,
@@ -1718,16 +1726,22 @@ def setup_manager(app):
             
             async def wait(message):
                 await remove_handler(callback_query.from_user.id)
-                await app.delete_messages(sent.chat.id, sent.id)
-                await app.delete_messages(message.chat.id, message.id)
-                
+                try:
+                    await app.delete_messages(sent.chat.id, sent.id)
+                    await app.delete_messages(message.chat.id, message.id)
+                except Exception:
+                    pass
+
                 if message.text == 'Отмена ❌':
                     sent2 = await app.send_message(callback_query.from_user.id, "❌ Отменено",
                                                    reply_markup=ReplyKeyboardRemove())
                     await asyncio.sleep(2)
-                    await app.delete_messages(sent2.chat.id, sent2.id)
+                    try:
+                        await app.delete_messages(sent2.chat.id, sent2.id)
+                    except Exception:
+                        pass
                     return
-                
+
                 try:
                     if workers_list:
                         
@@ -1785,14 +1799,20 @@ def setup_manager(app):
             
             async def wait(message, sent=sent):
                 await remove_handler(callback_query.from_user.id)
-                await app.delete_messages(sent.chat.id, sent.id)
-                await app.delete_messages(message.chat.id, message.id)
-                
+                try:
+                    await app.delete_messages(sent.chat.id, sent.id)
+                    await app.delete_messages(message.chat.id, message.id)
+                except Exception:
+                    pass
+
                 if message.text == 'Отмена ❌':
                     sent2 = await app.send_message(callback_query.from_user.id, "❌ Отменено",
                                                    reply_markup=ReplyKeyboardRemove())
                     await asyncio.sleep(2)
-                    await app.delete_messages(sent2.chat.id, sent2.id)
+                    try:
+                        await app.delete_messages(sent2.chat.id, sent2.id)
+                    except Exception:
+                        pass
                     return
                 
                 try:
