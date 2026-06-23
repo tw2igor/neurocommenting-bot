@@ -373,7 +373,7 @@ def setup_manager(app):
                 if workers_list:
                     
                     notification = await msg.reply(
-                        'Ждём, пока ChatGPT предоставит нам список ключевых слов... 😊')
+                        'Ждём, пока Timeweb AI подберёт ключевые слова... 😊')
                     
                     keywords = generate_keywords(message.text)
                     keywords = keywords.split('\n')
@@ -1759,14 +1759,14 @@ def setup_manager(app):
             
             if data.startswith('set prompt'):
                 await callback_query.message.edit(
-                    'Введите новую роль для ChatGPT:\n\n'
+                    'Введите новую роль для ИИ:\n\n'
                     'Например:\n\n'
                     '• <code>Вы - студентка</code>\n'
                     '• <code>Вы - маркетолог</code>\n'
                     '• <code>Вы - Стив Джобс</code>\n')
             if data.startswith('set what_to_write'):
                 await callback_query.message.edit(
-                    'Введите новый промпт для ChatGPT:\n\n'
+                    'Введите новый промпт для ИИ:\n\n'
                     'Например:\n\n'
                     '• <code>Напиши интересный комментарий до 10 слов на тему этого поста:</code>\n'
                     '• <code>Напиши короткую историю на тему этого поста:</code>\n'
@@ -1897,7 +1897,7 @@ def setup_manager(app):
                     if workers_list:
                         
                         notification = await callback_query.message.reply(
-                            'Ждём, пока ChatGPT предоставит нам список ключевых слов... 😊')
+                            'Ждём, пока Timeweb AI подберёт ключевые слова... 😊')
                         
 
                         keywords = generate_keywords(message.text)
