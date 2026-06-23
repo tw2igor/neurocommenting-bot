@@ -763,10 +763,9 @@ def setup_manager(app):
                 keyboard.append(
                     [InlineKeyboardButton(f'Комментировать шаблонами {use_gpt}', callback_data=f'switchgpt {client_data.phone_number}')])
 
-                if settings[0][6] == 1:
-                    keyboard.append(
-                        [InlineKeyboardButton(f'Тексты первого коммента',
-                                              callback_data=f'editpretexts {client_data.phone_number}')])
+                keyboard.append(
+                    [InlineKeyboardButton(f'Шаблоны коммента',
+                                          callback_data=f'editpretexts {client_data.phone_number}')])
 
                 keyboard.append(
                     [InlineKeyboardButton('Последние посты 🌴', callback_data=f'posts {client_data.phone_number}')])
