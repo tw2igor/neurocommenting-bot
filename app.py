@@ -483,13 +483,13 @@ def setup_manager(app):
                         workers_list[account_info.phone_number] = client
                         
                         if proxy.text != 'Без прокси':
-                            sql_edit('INSERT INTO workers VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                            sql_edit('INSERT INTO workers(session, proxy, prompt, auto_reply, delay, chance, be_first, what_to_write, mode) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
                                      (account_info.phone_number, proxy.text,
                                       'Вы - двадцатилетняя девушка',
                                       "Отвечу только когда перейдёшь по ссылке в описании)", 0, 1, 1,
                                       'Напиши интересный комментарий до 10 слов на тему этого поста:', 'text'))
                         else:
-                            sql_edit('INSERT INTO workers VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                            sql_edit('INSERT INTO workers(session, proxy, prompt, auto_reply, delay, chance, be_first, what_to_write, mode) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
                                      (account_info.phone_number, None,
                                       'Вы - двадцатилетняя девушка',
                                       "Отвечу только когда перейдёшь по ссылке в описании)", 0, 1, 1,
@@ -2142,13 +2142,13 @@ def setup_manager(app):
                                             setup_worker(client)
                                             
                                             if proxy.text != 'Без прокси':
-                                                sql_edit('INSERT INTO workers VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                                sql_edit('INSERT INTO workers(session, proxy, prompt, auto_reply, delay, chance, be_first, what_to_write, mode) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
                                                          (phone, proxy.text,
                                                           'Вы - двадцатилетняя девушка',
                                                           "Отвечу только когда перейдёшь по ссылке в описании)", 0, 1, 1,
                                       'Напиши интересный комментарий до 10 слов на тему этого поста:', 'text'))
                                             else:
-                                                sql_edit('INSERT INTO workers VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                                sql_edit('INSERT INTO workers(session, proxy, prompt, auto_reply, delay, chance, be_first, what_to_write, mode) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
                                                          (phone, None,
                                                           'Вы - двадцатилетняя девушка',
                                                           "Отвечу только когда перейдёшь по ссылке в описании)", 0, 1, 1,
@@ -2178,13 +2178,13 @@ def setup_manager(app):
                                 worker_apps.append(client)
                                 
                                 if proxy.text != 'Без прокси':
-                                    sql_edit('INSERT INTO workers VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                    sql_edit('INSERT INTO workers(session, proxy, prompt, auto_reply, delay, chance, be_first, what_to_write, mode) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
                                              (phone, proxy.text,
                                               'Вы - двадцатилетняя девушка',
                                               "Отвечу только когда перейдёшь по ссылке в описании)", 0, 1, 1,
                                       'Напиши интересный комментарий до 10 слов на тему этого поста:', 'text'))
                                 else:
-                                    sql_edit('INSERT INTO workers VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                    sql_edit('INSERT INTO workers(session, proxy, prompt, auto_reply, delay, chance, be_first, what_to_write, mode) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
                                              (phone, None,
                                               'Вы - двадцатилетняя девушка',
                                               "Отвечу только когда перейдёшь по ссылке в описании)", 0, 1, 1,
