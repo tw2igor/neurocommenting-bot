@@ -1312,21 +1312,23 @@ def setup_manager(app):
                                 f"INSERT INTO channels VALUES(?, '{data.split()[1]}', '{data.split()[2]}')", (chat_id,))
                             success += 1
 
-                            async for message in client.get_chat_history(chat_id, limit=1, offset_id=-1):
-                                dmsg = await client.get_discussion_message(chat_id, message.id)
-                                try:
-                                    msg = await dmsg.reply('👍')
-                                    await msg.delete()
-                                except Forbidden:
-                                    
+                            try:
+                                async for message in client.get_chat_history(chat_id, limit=1, offset_id=-1):
+                                    dmsg = await client.get_discussion_message(chat_id, message.id)
                                     try:
-                                        await client.join_chat(dmsg.chat.id)
                                         msg = await dmsg.reply('👍')
                                         await msg.delete()
+                                    except Forbidden:
+                                        try:
+                                            await client.join_chat(dmsg.chat.id)
+                                            msg = await dmsg.reply('👍')
+                                            await msg.delete()
+                                        except Exception as e:
+                                            print(e)
                                     except Exception as e:
                                         print(e)
-                                except Exception as e:
-                                    print(e)
+                            except Exception as e:
+                                print(e)
                                     
                             
                             
