@@ -1356,6 +1356,11 @@ def setup_manager(app):
 
 
 
+        elif data.startswith('clearpretexts'):
+
+            sql_edit(f"DELETE FROM pretexts WHERE session = '{data.split()[1]}'", ())
+            await pretexts_menu(callback_query)
+
         elif data.startswith('delpretext'):
 
             sql_edit(f'DELETE FROM pretexts WHERE id = {data.split()[1]}', ())

@@ -5,25 +5,23 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 async def pretexts_menu(callback_query):
 
     data = callback_query.data
-    pretexts = sql_select(f'SELECT text, id FROM pretexts WHERE session = {data.split()[1]}')
+    session = data.split()[1]
+    pretexts = sql_select(f"SELECT text, id FROM pretexts WHERE session = '{session}'")
+
+    kb = []
 
     if pretexts:
-
-        kb = []
+        texts_display = '\n'.join(f'<code>{p[0]}</code>' for p in pretexts)
+        header = f'<b>Шаблонные ответы и тексты для первого коммента</b>\n\n{texts_display}'
 
         for pretext in pretexts:
             kb.append([InlineKeyboardButton(pretext[0], callback_data=f'delpretext {pretext[1]}')])
 
-        kb.append([InlineKeyboardButton('Добавить тексты', callback_data=f'addpretexts {data.split()[1]}')])
-
-        await callback_query.message.edit(
-            'Тексты первичного комментария',
-            reply_markup=InlineKeyboardMarkup(kb)
-        )
+        kb.append([InlineKeyboardButton('Добавить тексты ➕', callback_data=f'addpretexts {session}'),
+                   InlineKeyboardButton('Очистить тексты 🗑', callback_data=f'clearpretexts {session}')])
 
     else:
-        await callback_query.message.edit(
-            'Вы ещё не добавляли тексты первичного комментария',
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton('Добавить тексты', callback_data=f'addpretexts {data.split()[1]}')]])
-        )
+        header = '<b>Шаблонные ответы и тексты для первого коммента</b>\n\nСписок пустой'
+        kb.append([InlineKeyboardButton('Добавить тексты ➕', callback_data=f'addpretexts {session}')])
+
+    await callback_query.message.edit(header, reply_markup=InlineKeyboardMarkup(kb))
