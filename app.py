@@ -841,7 +841,15 @@ def setup_manager(app):
                     
 
             except Exception as e:
-                await callback_query.message.reply(f'{workers_list}\n\n{e}')
+                phone_from_cb = data.split(' ', 1)[1] if ' ' in data else '?'
+                all_sessions = sql_select("SELECT session FROM workers")
+                await callback_query.message.reply(
+                    f'data repr: {data!r}\n'
+                    f'phone from callback: {phone_from_cb!r}\n'
+                    f'DB sessions: {all_sessions}\n'
+                    f'workers_list keys: {list(workers_list.keys())}\n\n'
+                    f'{e}'
+                )
                 
         elif data.startswith('allchannels'):
             channels = sql_select(f"SELECT id FROM channels WHERE session = '{data.split()[1]}'")
