@@ -3,6 +3,7 @@ import random
 import os
 import requests
 import xlsxwriter
+from datetime import date
 
 from pyrogram import Client, filters, compose
 from pyrogram.errors import FloodWait, UserDeactivatedBan, AuthKeyDuplicated, AuthKeyUnregistered, Forbidden, UserAlreadyParticipant
@@ -768,6 +769,9 @@ def setup_manager(app):
                                           callback_data=f'editpretexts {client_data.phone_number}')])
 
                 keyboard.append(
+                    [InlineKeyboardButton('Аутрич в ЛС 📨', callback_data=f'outreach {client_data.phone_number}')])
+
+                keyboard.append(
                     [InlineKeyboardButton('Последние посты 🌴', callback_data=f'posts {client_data.phone_number}')])
                 
                 keyboard.append(
@@ -866,6 +870,22 @@ def setup_manager(app):
                 await callback_query.message.edit(text, reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton('К аккаунту 👤', callback_data=f'user {data.split()[1]}')],
                     [InlineKeyboardButton('Список аккаунтов ◀️', callback_data='accounts')]]))
+
+        elif data.startswith('switchoutreach'):
+
+            current = sql_select(f"SELECT dm_enabled FROM workers WHERE session = '{data.split()[1]}'")
+
+            if current and current[0]:
+                if current[0][0] == 0:
+                    text = 'Аутрич в ЛС включён ✅'
+                    val = 1
+                else:
+                    text = 'Аутрич в ЛС выключен ❌'
+                    val = 0
+
+                sql_edit(f"UPDATE workers SET dm_enabled = {val} WHERE session = '{data.split()[1]}'", ())
+                await callback_query.message.edit(text, reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton('К аутричу 📨', callback_data=f'outreach {data.split()[1]}')]]))
 
         elif data.startswith('accounts'):
             await accounts(callback_query.message)
@@ -1393,6 +1413,121 @@ def setup_manager(app):
             await add_handler(callback_query.from_user.id, wait)
 
 
+        elif data.startswith('outreach_groups'):
+
+            session = data.split()[1]
+            groups = sql_select(f"SELECT group_id FROM outreach_groups WHERE session = '{session}'")
+
+            kb = []
+            if groups:
+                for g in groups:
+                    try:
+                        chat = await workers_list[session].get_chat(g[0])
+                        label = chat.title
+                    except Exception:
+                        label = str(g[0])
+                    kb.append([InlineKeyboardButton(f'❌ {label}', callback_data=f'del_outreach_group {g[0]} {session}')])
+
+            kb.append([InlineKeyboardButton('Добавить группу ➕', callback_data=f'add_outreach_group {session}')])
+            kb.append([InlineKeyboardButton('Назад ◀️', callback_data=f'outreach {session}')])
+
+            await callback_query.message.edit(
+                '<b>Группы для аутрича</b>\n\nНажми на группу чтобы удалить её из списка',
+                reply_markup=InlineKeyboardMarkup(kb))
+
+        elif data.startswith('del_outreach_group'):
+
+            group_id = data.split()[1]
+            session = data.split()[2]
+            sql_edit(f'DELETE FROM outreach_groups WHERE group_id = {group_id} AND session = ?', (session,))
+            # обновить data чтобы outreach_groups handler взял правильную сессию
+            callback_query.data = f'outreach_groups {session}'
+            data = callback_query.data
+
+            groups = sql_select(f"SELECT group_id FROM outreach_groups WHERE session = '{session}'")
+            kb = []
+            if groups:
+                for g in groups:
+                    try:
+                        chat = await workers_list[session].get_chat(g[0])
+                        label = chat.title
+                    except Exception:
+                        label = str(g[0])
+                    kb.append([InlineKeyboardButton(f'❌ {label}', callback_data=f'del_outreach_group {g[0]} {session}')])
+            kb.append([InlineKeyboardButton('Добавить группу ➕', callback_data=f'add_outreach_group {session}')])
+            kb.append([InlineKeyboardButton('Назад ◀️', callback_data=f'outreach {session}')])
+            await callback_query.message.edit(
+                '<b>Группы для аутрича</b>\n\nНажми на группу чтобы удалить её из списка',
+                reply_markup=InlineKeyboardMarkup(kb))
+
+        elif data.startswith('add_outreach_group'):
+
+            session = data.split()[1]
+            await callback_query.message.edit('🌴 Введите ссылку на группу или @username:')
+
+            async def wait(message):
+
+                await remove_handler(message.from_user.id)
+                try:
+                    await app.delete_messages(message.from_user.id, message.id)
+                except Exception:
+                    pass
+
+                link = message.text.strip()
+                if link.startswith('https://t.me/'):
+                    link = link[13:]
+                elif link.startswith('t.me/'):
+                    link = link[5:]
+                elif link.startswith('@'):
+                    link = link[1:]
+
+                try:
+                    res = await workers_list[session].join_chat(link)
+                    chat_id = res.id if hasattr(res, 'id') else res.chat.id
+                    sql_edit('INSERT INTO outreach_groups(group_id, session) VALUES(?, ?)', (chat_id, session))
+                    await callback_query.message.edit(
+                        '✅ Группа добавлена',
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton('К списку групп', callback_data=f'outreach_groups {session}')]]))
+                except Exception as e:
+                    await callback_query.message.edit(
+                        f'😛 Не удалось добавить группу\n\n<pre>{e}</pre>',
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton('Назад ◀️', callback_data=f'outreach {session}')]]))
+
+            await add_handler(callback_query.from_user.id, wait)
+
+        elif data.startswith('outreach'):
+
+            session = data.split()[1]
+            settings = sql_select(f"SELECT dm_enabled, dm_text, dm_daily_limit, dm_delay FROM workers WHERE session = '{session}'")
+
+            if not settings:
+                return
+
+            dm_enabled, dm_text, dm_daily_limit, dm_delay = settings[0]
+            enabled_label = '✅ Включён' if dm_enabled else '❌ Выключен'
+            today = str(date.today())
+            sent_today = sql_select(
+                f"SELECT COUNT(*) FROM messaged_users WHERE session = '{session}' AND messaged_date = '{today}'")
+            sent_count = sent_today[0][0] if sent_today else 0
+
+            text = (
+                f'<b>Аутрич в ЛС 📨</b>\n\n'
+                f'Статус: {enabled_label}\n'
+                f'Отправлено сегодня: {sent_count} / {dm_daily_limit}\n'
+                f'Задержка между DM: {dm_delay} сек\n\n'
+                f'Текст сообщения:\n<code>{dm_text or "не задан"}</code>'
+            )
+
+            await callback_query.message.edit(text, reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton(f'Вкл/Выкл', callback_data=f'switchoutreach {session}')],
+                [InlineKeyboardButton('Текст сообщения ✏️', callback_data=f'set dm_text {session}')],
+                [InlineKeyboardButton(f'Лимит в день: {dm_daily_limit}', callback_data=f'set dm_daily_limit {session}'),
+                 InlineKeyboardButton(f'Задержка: {dm_delay} сек', callback_data=f'set dm_delay {session}')],
+                [InlineKeyboardButton('Группы для мониторинга 🌐', callback_data=f'outreach_groups {session}')],
+                [InlineKeyboardButton('Назад к аккаунту ◀️', callback_data=f'user {session}')]]))
+
         elif data.startswith('change'):
 
             client = workers_list[data.split(" ", 2)[1]]
@@ -1647,7 +1782,16 @@ def setup_manager(app):
             
             elif data.startswith('set delay'):
                 await callback_query.message.edit('Введите новое значение задержки, в секундах:')
-            
+
+            elif data.startswith('set dm_text'):
+                await callback_query.message.edit('Введите текст сообщения, которое будет отправляться в ЛС:')
+
+            elif data.startswith('set dm_daily_limit'):
+                await callback_query.message.edit('Введите максимальное количество DM в день:')
+
+            elif data.startswith('set dm_delay'):
+                await callback_query.message.edit('Введите задержку между DM в секундах:')
+
             elif data.startswith('set chance'):
                 await callback_query.message.edit('Введите шанс, с которым будут оставляться комментарии\n\n'
                                                   'Если хотите 33%, введите 3 (1к<b>3</b>)\n'
@@ -2387,6 +2531,59 @@ def setup_worker(app):
                     service_channel[0][0],
                     f'<b>Ошибка при комментарии в {message.chat.title}</b>\n\n'
                     f'{e}')
+
+    @app.on_message(filters.group, group=4)
+    async def dm_outreach(_, message):
+
+        if not message.from_user or message.from_user.is_bot:
+            return
+
+        client_data = await app.get_me()
+
+        if message.from_user.id == client_data.id:
+            return
+
+        in_outreach = sql_select(
+            f"SELECT group_id FROM outreach_groups "
+            f"WHERE session = '{client_data.phone_number}' AND group_id = {message.chat.id}")
+        if not in_outreach:
+            return
+
+        settings = sql_select(f"SELECT * FROM workers WHERE session = '{client_data.phone_number}'")
+        if not settings or not settings[0][10]:
+            return
+
+        dm_text = settings[0][11]
+        dm_daily_limit = settings[0][12]
+        dm_delay = settings[0][13]
+
+        if not dm_text:
+            return
+
+        today = str(date.today())
+        sent_today = sql_select(
+            f"SELECT COUNT(*) FROM messaged_users "
+            f"WHERE session = '{client_data.phone_number}' AND messaged_date = '{today}'")
+        if sent_today and sent_today[0][0] >= dm_daily_limit:
+            return
+
+        user_id = str(message.from_user.id)
+
+        already_messaged = sql_select(
+            f"SELECT user_id FROM messaged_users "
+            f"WHERE session = '{client_data.phone_number}' AND user_id = '{user_id}'")
+        if already_messaged:
+            return
+
+        await asyncio.sleep(dm_delay)
+
+        try:
+            await app.send_message(int(user_id), dm_text)
+            sql_edit(
+                'INSERT INTO messaged_users(user_id, session, messaged_date) VALUES(?, ?, ?)',
+                (user_id, client_data.phone_number, today))
+        except Exception as e:
+            print(f'dm_outreach error: {e}')
 
     @app.on_message(filters.private)
     async def comment(_, message):

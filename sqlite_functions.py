@@ -20,7 +20,14 @@ with sqlite3.connect("database.db") as connection:
         'CREATE TABLE IF NOT EXISTS pretexts'
         '(id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, session TEXT NOT NULL)',
 
-        'UPDATE channels SET purpose = "comments"'
+        'UPDATE channels SET purpose = "comments"',
+
+        'CREATE TABLE IF NOT EXISTS outreach_groups(group_id INT, session TEXT NOT NULL)',
+        'CREATE TABLE IF NOT EXISTS messaged_users(user_id TEXT NOT NULL, session TEXT NOT NULL, messaged_date TEXT NOT NULL)',
+        'ALTER TABLE workers ADD COLUMN dm_enabled INT DEFAULT 0',
+        'ALTER TABLE workers ADD COLUMN dm_text TEXT',
+        'ALTER TABLE workers ADD COLUMN dm_daily_limit INT DEFAULT 20',
+        'ALTER TABLE workers ADD COLUMN dm_delay FLOAT DEFAULT 60',
     ]
 
     def sql_edit(command, args):
