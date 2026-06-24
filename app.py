@@ -126,6 +126,19 @@ async def menu(message):
         "Список ваших аккаунтов:",
         reply_markup=InlineKeyboardMarkup(keyboard))
 
+async def notify(text):
+    service_channel = sql_select('SELECT channel FROM managers')
+    if not service_channel or not service_channel[0][0]:
+        return
+    if not manager_apps:
+        print('[notify] manager_apps пуст')
+        return
+    try:
+        await manager_apps[0].send_message(service_channel[0][0], text)
+    except Exception as e:
+        print(f'[notify] ошибка отправки в канал: {e}')
+
+
 def _timeweb_headers():
     return {
         'Content-Type': 'application/json',
@@ -585,21 +598,15 @@ def setup_manager(app):
                                             sent_message = await post_message.reply(random.choice(emojies))
                                     except Exception as e:
                                         print(e)
-                                        if service_channel:
-                                            await manager_apps[0].send_message(
-                                                service_channel[0][0],
-                                                f'<b>Ошибка при комментарии в {chat.title}</b>\n\n'
-                                                f'{e}')
-                                            continue
+                                        await notify(
+                                            f'❌ <b>Ошибка при комментарии в {chat.title}</b>\n\n{e}')
+                                        continue
 
                                 except Exception as e:
                                     print(e)
-                                    if service_channel:
-                                        await manager_apps[0].send_message(
-                                            service_channel[0][0],
-                                            f'<b>Ошибка при комментарии в {chat.title}</b>\n\n'
-                                            f'{e}')
-                                        continue
+                                    await notify(
+                                        f'❌ <b>Ошибка при комментарии в {chat.title}</b>\n\n{e}')
+                                    continue
 
                                 return
 
@@ -621,33 +628,23 @@ def setup_manager(app):
                                         await test_message.delete()
                                     except Exception as e:
                                         print(e)
-                                        if service_channel:
-                                            await manager_apps[0].send_message(
-                                                service_channel[0][0],
-                                                f'<b>Ошибка при комментарии в {chat.title}</b>\n\n'
-                                                f'{e}')
-                                            continue
+                                        await notify(
+                                            f'❌ <b>Ошибка при комментарии в {chat.title}</b>\n\n{e}')
+                                        continue
                                 except Exception as e:
                                     print(e)
-                                    if service_channel:
-                                        await manager_apps[0].send_message(
-                                            service_channel[0][0],
-                                            f'<b>Ошибка при комментарии в {chat.title}</b>\n\n'
-                                            f'{e}')
-                                        continue
+                                    await notify(
+                                        f'❌ <b>Ошибка при комментарии в {chat.title}</b>\n\n{e}')
+                                    continue
                                     
                             else:
                                 sent_message = None
                         
                         except Exception as e:
                             print(e)
-                            if service_channel:
-                                await manager_apps[0].send_message(
-                                    service_channel[0][0],
-                                    f'<b>Ошибка при комментарии в {chat.title}</b>\n\n'
-                                    f'{e}')
+                            await notify(f'❌ <b>Ошибка при комментарии в {chat.title}</b>\n\n{e}')
                             return
-                        
+
                         prompt = settings[0][7] + f' "{post}"'
                         
                         reply = None
@@ -671,32 +668,24 @@ def setup_manager(app):
                                         await client.join_chat(post_message.chat.id)
                                         await post_message.reply(output)
                                     except Exception as e:
-                                        if service_channel:
-                                            await manager_apps[0].send_message(
-                                                service_channel[0][0],
-                                                f'<b>Ошибка при комментарии в {post_message.chat.title}</b>\n\n'
-                                                f'{e}')
+                                        await notify(
+                                            f'❌ <b>Ошибка при комментарии в {post_message.chat.title}</b>\n\n{e}')
                                 # for admin in admins:
                                 #     for client in worker_apps:
                                 #         try:
                                 #             await client.send_message(admin, reply.link)
                                 #         finally:
                                 #             pass
-                            if service_channel and reply:
-                                await manager_apps[0].send_message(
-                                    service_channel[0][0],
-                                    f'<b>Новый комментарий в {post_message.chat.title}</b>\n\n'
-                                    f'{reply.link}'
-                                )
-                                
+                            if reply:
+                                await notify(
+                                    f'💬 <b>Новый комментарий в {post_message.chat.title}</b>\n\n'
+                                    f'{reply.link}')
+
                             await msg.edit(msg.text + f'\n{reply.link}')
-                        
+
                         except Exception as e:
-                            if service_channel:
-                                await manager_apps[0].send_message(
-                                    service_channel[0][0],
-                                    f'<b>Ошибка при комментарии в {post_message.chat.title}</b>\n\n'
-                                    f'{e}')
+                            await notify(
+                                f'❌ <b>Ошибка при комментарии в {post_message.chat.title}</b>\n\n{e}')
                         
                         
                 else:
@@ -2115,16 +2104,38 @@ def setup_manager(app):
                         channel_message = int(channel_message)
                         
                     service_channel = await app.get_chat(channel_message)
-                    
+
                     sql_edit('UPDATE managers SET channel = ?', (service_channel.id,))
-                    
+
+                    # Тестовая отправка от менеджер-бота чтобы проверить доступ
+                    test_ok = False
+                    test_error = ''
+                    if manager_apps:
+                        try:
+                            await manager_apps[0].send_message(
+                                service_channel.id,
+                                f'✅ Канал уведомлений настроен. Буду присылать сюда логи работы.')
+                            test_ok = True
+                        except Exception as e:
+                            test_error = str(e)
+
+                    if test_ok:
+                        result_text = f"👌 Уведомления настроены в {service_channel.title}"
+                    else:
+                        result_text = (
+                            f"⚠️ Канал сохранён, но бот не может туда писать.\n\n"
+                            f"Убедитесь что бот добавлен администратором в {service_channel.title}\n\n"
+                            f"Ошибка: <code>{test_error}</code>")
+
                     sent2 = await app.send_message(
                         callback_query.from_user.id,
-                        f"👌 Уведомления теперь присылаются в {service_channel.title}",
+                        result_text,
                         reply_markup=ReplyKeyboardRemove())
-                    await asyncio.sleep(2)
-                    await app.delete_messages(channel_message.chat.id, channel_message.id)
-                    await app.delete_messages(sent2.chat.id, sent2.id)
+                    await asyncio.sleep(3)
+                    try:
+                        await app.delete_messages(sent2.chat.id, sent2.id)
+                    except Exception:
+                        pass
                 
                 except Exception as e:
                     print(e)
@@ -2434,16 +2445,12 @@ def setup_worker(app):
                                 #         f'{e}')
                                 #     continue
 
-                            if service_channel and sent_message:
-                                try:
-                                    await manager_apps[0].send_message(
-                                        service_channel[0][0],
-                                        f'💬 <b>Шаблонный комментарий</b>\n\n'
-                                        f'Аккаунт: {client_data.first_name}\n'
-                                        f'Чат: {channel_message.chat.title}\n\n'
-                                        f'{sent_message.link}')
-                                except Exception:
-                                    pass
+                            if sent_message:
+                                await notify(
+                                    f'💬 <b>Шаблонный комментарий</b>\n\n'
+                                    f'Аккаунт: {client_data.first_name}\n'
+                                    f'Чат: {channel_message.chat.title}\n\n'
+                                    f'{sent_message.link}')
                             return
 
                         if settings[0][6] == 1:
@@ -2458,16 +2465,11 @@ def setup_worker(app):
                             sent_message = None
 
                     except Exception as e:
-                        if service_channel:
-                            try:
-                                await manager_apps[0].send_message(
-                                    service_channel[0][0],
-                                    f'❌ <b>Ошибка комментария</b>\n\n'
-                                    f'Аккаунт: {client_data.first_name}\n'
-                                    f'Чат: {channel_message.chat.title}\n\n'
-                                    f'{e}')
-                            except Exception:
-                                pass
+                        await notify(
+                            f'❌ <b>Ошибка комментария</b>\n\n'
+                            f'Аккаунт: {client_data.first_name}\n'
+                            f'Чат: {channel_message.chat.title}\n\n'
+                            f'{e}')
                         return
 
                     prompt = settings[0][7] + f' "{post}"'
@@ -2480,28 +2482,18 @@ def setup_worker(app):
                             SENT_TODAY += 1
                         else:
                             reply = await message.reply(output)
-                        if service_channel:
-                            try:
-                                await manager_apps[0].send_message(
-                                    service_channel[0][0],
-                                    f'💬 <b>Новый комментарий</b>\n\n'
-                                    f'Аккаунт: {client_data.first_name}\n'
-                                    f'Чат: {channel_message.chat.title}\n\n'
-                                    f'{reply.link}')
-                            except Exception:
-                                pass
+                        await notify(
+                            f'💬 <b>Новый комментарий</b>\n\n'
+                            f'Аккаунт: {client_data.first_name}\n'
+                            f'Чат: {channel_message.chat.title}\n\n'
+                            f'{reply.link}')
 
                     except Exception as e:
-                        if service_channel:
-                            try:
-                                await manager_apps[0].send_message(
-                                    service_channel[0][0],
-                                    f'❌ <b>Ошибка комментария</b>\n\n'
-                                    f'Аккаунт: {client_data.first_name}\n'
-                                    f'Чат: {channel_message.chat.title}\n\n'
-                                    f'{e}')
-                            except Exception:
-                                pass
+                        await notify(
+                            f'❌ <b>Ошибка комментария</b>\n\n'
+                            f'Аккаунт: {client_data.first_name}\n'
+                            f'Чат: {channel_message.chat.title}\n\n'
+                            f'{e}')
     
     @app.on_message(filters.group, group=3)
     async def comment_group(_, message):
@@ -2534,16 +2526,12 @@ def setup_worker(app):
                     sent_message = await message.reply(random.choice(pretexts)[0])
                 else:
                     sent_message = await message.reply(random.choice(emojies))
-                if service_channel and sent_message:
-                    try:
-                        await manager_apps[0].send_message(
-                            service_channel[0][0],
-                            f'💬 <b>Шаблонный комментарий</b>\n\n'
-                            f'Аккаунт: {client_data.first_name}\n'
-                            f'Чат: {message.chat.title}\n\n'
-                            f'{sent_message.link}')
-                    except Exception:
-                        pass
+                if sent_message:
+                    await notify(
+                        f'💬 <b>Шаблонный комментарий</b>\n\n'
+                        f'Аккаунт: {client_data.first_name}\n'
+                        f'Чат: {message.chat.title}\n\n'
+                        f'{sent_message.link}')
                 return
 
             if settings[0][6] == 1:
@@ -2565,28 +2553,18 @@ def setup_worker(app):
 
             SENT_TODAY += 1
 
-            if service_channel:
-                try:
-                    await manager_apps[0].send_message(
-                        service_channel[0][0],
-                        f'💬 <b>Новый комментарий</b>\n\n'
-                        f'Аккаунт: {client_data.first_name}\n'
-                        f'Чат: {message.chat.title}\n\n'
-                        f'{reply.link}')
-                except Exception:
-                    pass
+            await notify(
+                f'💬 <b>Новый комментарий</b>\n\n'
+                f'Аккаунт: {client_data.first_name}\n'
+                f'Чат: {message.chat.title}\n\n'
+                f'{reply.link}')
 
         except Exception as e:
-            if service_channel:
-                try:
-                    await manager_apps[0].send_message(
-                        service_channel[0][0],
-                        f'❌ <b>Ошибка комментария</b>\n\n'
-                        f'Аккаунт: {client_data.first_name}\n'
-                        f'Чат: {message.chat.title}\n\n'
-                        f'{e}')
-                except Exception:
-                    pass
+            await notify(
+                f'❌ <b>Ошибка комментария</b>\n\n'
+                f'Аккаунт: {client_data.first_name}\n'
+                f'Чат: {message.chat.title}\n\n'
+                f'{e}')
 
     @app.on_message(filters.group, group=4)
     async def dm_outreach(_, message):
@@ -2639,29 +2617,19 @@ def setup_worker(app):
             sql_edit(
                 'INSERT INTO messaged_users(user_id, session, messaged_date) VALUES(?, ?, ?)',
                 (user_id, client_data.phone_number, today))
-            if service_channel:
-                try:
-                    sender_name = message.from_user.username or message.from_user.first_name
-                    await manager_apps[0].send_message(
-                        service_channel[0][0],
-                        f'📨 <b>Аутрич DM отправлен</b>\n\n'
-                        f'Аккаунт: {client_data.first_name}\n'
-                        f'Группа: {message.chat.title}\n'
-                        f'Получатель: @{sender_name}')
-                except Exception:
-                    pass
+            sender_name = message.from_user.username or message.from_user.first_name
+            await notify(
+                f'📨 <b>Аутрич DM отправлен</b>\n\n'
+                f'Аккаунт: {client_data.first_name}\n'
+                f'Группа: {message.chat.title}\n'
+                f'Получатель: @{sender_name}')
         except Exception as e:
             print(f'dm_outreach error: {e}')
-            if service_channel:
-                try:
-                    await manager_apps[0].send_message(
-                        service_channel[0][0],
-                        f'❌ <b>Ошибка аутрич DM</b>\n\n'
-                        f'Аккаунт: {client_data.first_name}\n'
-                        f'Группа: {message.chat.title}\n\n'
-                        f'{e}')
-                except Exception:
-                    pass
+            await notify(
+                f'❌ <b>Ошибка аутрич DM</b>\n\n'
+                f'Аккаунт: {client_data.first_name}\n'
+                f'Группа: {message.chat.title}\n\n'
+                f'{e}')
 
     @app.on_message(filters.private)
     async def comment(_, message):
@@ -2692,18 +2660,12 @@ def setup_worker(app):
             if settings and settings[0][3]:
                 await asyncio.sleep(1)
                 await message.reply(settings[0][3])
-                service_channel = sql_select('SELECT channel FROM managers')
-                if service_channel:
-                    try:
-                        sender = f'@{message.from_user.username}' if message.from_user.username else message.from_user.first_name
-                        await manager_apps[0].send_message(
-                            service_channel[0][0],
-                            f'💬 <b>Автоответ отправлен</b>\n\n'
-                            f'Аккаунт: {client_data.first_name}\n'
-                            f'Написал: {sender}\n'
-                            f'Сообщение: {(message.text or "")[:200]}')
-                    except Exception:
-                        pass
+                sender = f'@{message.from_user.username}' if message.from_user.username else message.from_user.first_name
+                await notify(
+                    f'💬 <b>Автоответ отправлен</b>\n\n'
+                    f'Аккаунт: {client_data.first_name}\n'
+                    f'Написал: {sender}\n'
+                    f'Сообщение: {(message.text or "")[:200]}')
             else:
                 await app.send_chat_action(message.chat.id, ChatAction.CANCEL)
 
