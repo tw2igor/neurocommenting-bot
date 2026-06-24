@@ -21,7 +21,7 @@ from pyrogram.raw.functions.contacts import Search
 from handlers import add_handler, remove_handler, is_handler
 from menus import pretexts_menu
 from sqlite_functions import sql_select, sql_edit, core_commands
-from config import API_ID, API_HASH, BOT_ID, BOT_LINK, BOT_TOKEN, ADMINS, TIMEWEB_TOKEN, TIMEWEB_AGENT_ID
+from config import API_ID, API_HASH, BOT_ID, BOT_LINK, BOT_TOKEN, ADMINS, TIMEWEB_TOKEN, TIMEWEB_AGENT_ID, PROXY
 
 # важное
 
@@ -251,6 +251,8 @@ def format_proxy(proxy):
     else:
         return False
 
+GLOBAL_PROXY = format_proxy(PROXY.split(':')) if PROXY else None
+
 
 def startup():
     for token in managers:
@@ -258,9 +260,9 @@ def startup():
         global MANAGERS_COUNT
         
         try:
-            client = Client(f"bot{MANAGERS_COUNT}", api_id=API_ID, api_hash=API_HASH, bot_token=token[0])
+            client = Client(f"bot{MANAGERS_COUNT}", api_id=API_ID, api_hash=API_HASH, bot_token=token[0], proxy=GLOBAL_PROXY)
 
-            
+
             client.start()
             client.stop()
             
@@ -285,12 +287,12 @@ def startup():
 
                     client = Client(session[0], api_id=API_ID, api_hash=API_HASH, proxy=proxy)
                 except ConnectionError:
-                    client = Client(session[0], api_id=API_ID, api_hash=API_HASH)
+                    client = Client(session[0], api_id=API_ID, api_hash=API_HASH, proxy=GLOBAL_PROXY)
                 except:
-                    client = Client(session[0], api_id=API_ID, api_hash=API_HASH)
-            
+                    client = Client(session[0], api_id=API_ID, api_hash=API_HASH, proxy=GLOBAL_PROXY)
+
             else:
-                client = Client(session[0], api_id=API_ID, api_hash=API_HASH)
+                client = Client(session[0], api_id=API_ID, api_hash=API_HASH, proxy=GLOBAL_PROXY)
             
             try:
                 client.start()
@@ -488,7 +490,7 @@ def setup_manager(app):
                 try:
                     
                     if proxy.text == 'Без прокси':
-                        client = Client(document.document.file_name[:-8], api_id=API_ID, api_hash=API_HASH)
+                        client = Client(document.document.file_name[:-8], api_id=API_ID, api_hash=API_HASH, proxy=GLOBAL_PROXY)
                     
                     else:
                         
@@ -515,7 +517,7 @@ def setup_manager(app):
                         await asyncio.sleep(2)
                         await sent.reply(f"😕 Ботов пока что так добавлять нельзя, ещё не написал код под это")
                     else:
-                        client = Client(str(account_info.phone_number), api_id=API_ID, api_hash=API_HASH)
+                        client = Client(str(account_info.phone_number), api_id=API_ID, api_hash=API_HASH, proxy=GLOBAL_PROXY)
                         await client.start()
                         try:
                             await client.send_message((await app.get_me()).username, '👋')
@@ -2077,7 +2079,7 @@ def setup_manager(app):
                 try:
                     global MANAGERS_COUNT
                     
-                    client = Client(f"bot{MANAGERS_COUNT}", api_id=API_ID, api_hash=API_HASH, bot_token=token.text)
+                    client = Client(f"bot{MANAGERS_COUNT}", api_id=API_ID, api_hash=API_HASH, bot_token=token.text, proxy=GLOBAL_PROXY)
                     MANAGERS_COUNT += 1
                     
                     setup_manager(client)
@@ -2456,8 +2458,8 @@ def setup_manager(app):
                         phone = number.text.replace(' ', '').replace('+', '')
                         
                         if proxy.text == 'Без прокси':
-                            client = Client(phone, API_ID, API_HASH)
-                        
+                            client = Client(phone, API_ID, API_HASH, proxy=GLOBAL_PROXY)
+
                         else:
                             
                             proxy_to_login = proxy.text.split(':')
