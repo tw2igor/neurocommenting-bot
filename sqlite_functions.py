@@ -30,9 +30,6 @@ with sqlite3.connect("database.db") as connection:
         'ALTER TABLE workers ADD COLUMN dm_delay FLOAT DEFAULT 60',
 
         'CREATE TABLE IF NOT EXISTS outreach_triggers(id INTEGER PRIMARY KEY AUTOINCREMENT, word TEXT NOT NULL, session TEXT NOT NULL)',
-
-        'CREATE TABLE IF NOT EXISTS reply_state(user_id TEXT NOT NULL, session TEXT NOT NULL, round INT DEFAULT 1)',
-        'ALTER TABLE workers ADD COLUMN reply_max_rounds INT DEFAULT 1',
     ]
 
     def sql_edit(command, args):
