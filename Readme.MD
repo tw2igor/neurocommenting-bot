@@ -118,11 +118,12 @@ cd /root/ComBot
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install requests xlsxwriter
+pip install requests xlsxwriter tgcrypto
 pip install "git+https://github.com/KurimuzonAkuma/pyrogram/archive/dev.zip"
 ```
 
 > Используется форк Pyrogram от KurimuzonAkuma — он поддерживает актуальные функции Telegram API.
+> `tgcrypto` — опциональная C-библиотека для ускорения MTProto-шифрования. Без неё бот работает, но медленнее.
 
 ### 6. Получи Telegram API credentials
 
