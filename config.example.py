@@ -14,6 +14,6 @@ ADMINS = (123456789,)
 # Формат: 'socks5:host:port' или 'socks5:host:port:user:pass'
 PROXY = None
 
-# Timeweb AI (agent.timeweb.cloud)
-TIMEWEB_TOKEN = 'your_timeweb_bearer_token'
-TIMEWEB_AGENT_ID = 'your-agent-access-id'
+# AI API
+AI_TOKEN = 'your_bearer_token'
+AI_AGENT_ID = 'your-agent-access-id'

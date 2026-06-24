@@ -21,7 +21,7 @@ from pyrogram.raw.functions.contacts import Search
 from handlers import add_handler, remove_handler, is_handler
 from menus import pretexts_menu
 from sqlite_functions import sql_select, sql_edit, core_commands
-from config import API_ID, API_HASH, BOT_ID, BOT_LINK, BOT_TOKEN, ADMINS, TIMEWEB_TOKEN, TIMEWEB_AGENT_ID
+from config import API_ID, API_HASH, BOT_ID, BOT_LINK, BOT_TOKEN, ADMINS, AI_TOKEN, AI_AGENT_ID
 try:
     from config import PROXY
 except ImportError:
@@ -30,7 +30,7 @@ except ImportError:
 # важное
 
 SENT_TODAY = 0
-TIMEWEB_API_BASE = 'https://agent.timeweb.cloud/api/v1/cloud-ai/agents'
+AI_API_BASE = 'https://agent.timeweb.cloud/api/v1/cloud-ai/agents'
 
 conversation_history = ["Привет, как дела?", "Все отлично! Как я могу помочь вам?"]
 
@@ -145,11 +145,11 @@ async def notify(text):
 def _timeweb_headers():
     return {
         'Content-Type': 'application/json',
-        'Authorization': f'Bearer {TIMEWEB_TOKEN}',
+        'Authorization': f'Bearer {AI_TOKEN}',
     }
 
 def _timeweb_url():
-    return f'{TIMEWEB_API_BASE}/{TIMEWEB_AGENT_ID}/v1/chat/completions'
+    return f'{AI_API_BASE}/{AI_AGENT_ID}/v1/chat/completions'
 
 def generate_keywords(keyword):
     url = _timeweb_url()
