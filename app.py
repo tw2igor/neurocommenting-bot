@@ -30,7 +30,6 @@ TIMEWEB_API_BASE = 'https://agent.timeweb.cloud/api/v1/cloud-ai/agents'
 
 conversation_history = ["Привет, как дела?", "Все отлично! Как я могу помочь вам?"]
 
-admins_only = False
 admins = ADMINS
 
 # костыль для остановки парсинга, потом перепишу
@@ -134,7 +133,7 @@ async def notify(text):
         print('[notify] manager_apps пуст')
         return
     try:
-        await manager_apps[0].send_message(service_channel[0][0], text)
+        await manager_apps[0].send_message(int(service_channel[0][0]), text, parse_mode=ParseMode.HTML)
     except Exception as e:
         print(f'[notify] ошибка отправки в канал: {e}')
 
@@ -304,7 +303,7 @@ def setup_manager(app):
     @app.on_message(filters.command('start', '/'))
     async def callback(_, message):
         
-        if not admins_only or message.from_user.id in admins:
+        if message.from_user.id in admins:
         
             await app.delete_messages(message.chat.id, message.id)
             await app.send_message(message.from_user.id, "👮‍♀️")
@@ -319,7 +318,7 @@ def setup_manager(app):
     @app.on_message(filters.command('Мои аккаунты 🙂', ''))
     async def callback(_, message):
         
-        if not admins_only or message.from_user.id in admins:
+        if message.from_user.id in admins:
             await app.delete_messages(message.chat.id, message.id)
             
             sent = await app.send_message(message.from_user.id, "Минутку...")
@@ -329,7 +328,7 @@ def setup_manager(app):
     @app.on_message(filters.command('Меню 🌴', ''))
     async def callback(_, message):
         
-        if not admins_only or message.from_user.id in admins:
+        if message.from_user.id in admins:
             await app.delete_messages(message.chat.id, message.id)
             
             sent = await app.send_message(message.from_user.id, "Минутку...")
@@ -695,10 +694,13 @@ def setup_manager(app):
     
     @app.on_callback_query()
     async def callback(_, callback_query):
-        
+
+        if callback_query.from_user.id not in admins:
+            return
+
         data = callback_query.data
         global workers_list
-        
+
         if data.startswith('user'):
             try:
                 await callback_query.message.edit('Получаем данные об аккаунте...')
