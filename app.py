@@ -214,6 +214,29 @@ async def generate_response(prompt, role, app):
         print(e)
 
 
+async def generate_dialogue(history, system_role, extra_prompt=''):
+    """history: list of {'role': 'user'/'assistant', 'content': str}"""
+    try:
+        url = _timeweb_url()
+        headers = _timeweb_headers()
+        system_content = system_role
+        if extra_prompt:
+            system_content += f'\n\n{extra_prompt}'
+        messages = [{"role": "system", "content": system_content}] + history
+        gptreq = requests.post(url, headers=headers, json={'model': 'gpt-4', 'messages': messages})
+        if gptreq.status_code == 200:
+            reply = gptreq.json()["choices"][0]['message']['content']
+            if reply.startswith('"') and reply.endswith('"'):
+                reply = reply[1:-1]
+            return reply
+        else:
+            print(f'[generate_dialogue] error {gptreq.status_code}: {gptreq.text}')
+            return None
+    except Exception as e:
+        print(f'[generate_dialogue] exception: {e}')
+        return None
+
+
 def format_proxy(proxy):
     if len(proxy) == 5:
         return {"scheme": proxy[0],
@@ -718,19 +741,21 @@ def setup_manager(app):
                 keyboard = []
                 
                 
+                reply_use_ai_info = settings[0][14] if len(settings[0]) > 14 else 0
+                autoreply_mode = 'ИИ-диалог 🤖' if reply_use_ai_info else f'Статичный: <code>{settings[0][3]}</code>'
                 reply_text = (
                     f'<b>{client_data.first_name}</b> @{client_data.username}:\n\n'
                     f'⭐ Премиум: {client_data.is_premium}\n'
                     f'🚫 Ограничения: {client_data.is_restricted}\n\n'
                     f'🤖 Роль: <code>{settings[0][2]}</code>\n'
                     f'🤖 Промпт: <code>{settings[0][7]}</code>\n\n'
-                    f'👩‍🎓 Автоответ: <code>{settings[0][3]}</code>')
+                    f'💬 Автоответ: {autoreply_mode}')
                 
                 keyboard.append(
                     [InlineKeyboardButton('Промпт 🤖', callback_data=f'set what_to_write {client_data.phone_number}')])
                 keyboard.append(
                     [InlineKeyboardButton('Роль 🤖', callback_data=f'set prompt {client_data.phone_number}'),
-                     InlineKeyboardButton('Автоответ 👩‍🎓', callback_data=f'set auto_reply {client_data.phone_number}')])
+                     InlineKeyboardButton('Автоответы 💬', callback_data=f'autoreply_menu {client_data.phone_number}')])
                 keyboard.append(
                     [InlineKeyboardButton(
                         f'Задержка - {settings[0][4]} ⌛', callback_data=f'set delay {client_data.phone_number}'),
@@ -1814,6 +1839,83 @@ def setup_manager(app):
             
             await add_handler(callback_query.from_user.id, functions[args[1]][1])
         
+        elif data.startswith('autoreply_menu'):
+
+            session = data.split()[1]
+            s = sql_select(f"SELECT auto_reply, reply_use_ai, reply_role, reply_prompt, reply_max_rounds FROM workers WHERE session = '{session}'")
+            if not s:
+                return
+            auto_reply_text, reply_use_ai, reply_role, reply_prompt, reply_max_rounds = s[0]
+            reply_max_rounds = reply_max_rounds or 3
+            mode_label = '🤖 ИИ-диалог' if reply_use_ai else '📝 Статичный текст'
+            text = (
+                f'<b>Автоответы 💬</b>\n\n'
+                f'Режим: <b>{mode_label}</b>\n\n'
+                f'<b>Статичный текст:</b>\n<code>{auto_reply_text or "не задан"}</code>\n\n'
+                f'<b>ИИ-диалог:</b>\n'
+                f'Роль: <code>{reply_role or "не задана"}</code>\n'
+                f'Промпт: <code>{reply_prompt or "не задан"}</code>\n'
+                f'Раундов: <code>{reply_max_rounds}</code>'
+            )
+            kb = [
+                [InlineKeyboardButton(
+                    f'Режим: {"→ Статичный" if reply_use_ai else "→ ИИ-диалог"}',
+                    callback_data=f'togglereplyai {session}')],
+                [InlineKeyboardButton('Статичный текст ✏️', callback_data=f'set auto_reply {session}')],
+                [InlineKeyboardButton('Роль для диалога 🤖', callback_data=f'set reply_role {session}')],
+                [InlineKeyboardButton('Промпт для диалога 📝', callback_data=f'set reply_prompt {session}')],
+                [InlineKeyboardButton(f'Раундов: {reply_max_rounds}', callback_data=f'set reply_max_rounds {session}')],
+                [InlineKeyboardButton('Очистить историю 🗑', callback_data=f'clear_reply_history {session}')],
+                [InlineKeyboardButton('Назад к аккаунту ◀️', callback_data=f'user {session}')],
+            ]
+            await callback_query.message.edit(text, reply_markup=InlineKeyboardMarkup(kb))
+
+        elif data.startswith('togglereplyai'):
+
+            session = data.split()[1]
+            current = sql_select(f"SELECT reply_use_ai FROM workers WHERE session = '{session}'")
+            new_val = 0 if (current and current[0][0]) else 1
+            sql_edit(f"UPDATE workers SET reply_use_ai = {new_val} WHERE session = '{session}'", ())
+            callback_query.data = f'autoreply_menu {session}'
+            data = callback_query.data
+
+            s = sql_select(f"SELECT auto_reply, reply_use_ai, reply_role, reply_prompt, reply_max_rounds FROM workers WHERE session = '{session}'")
+            if not s:
+                return
+            auto_reply_text, reply_use_ai, reply_role, reply_prompt, reply_max_rounds = s[0]
+            reply_max_rounds = reply_max_rounds or 3
+            mode_label = '🤖 ИИ-диалог' if reply_use_ai else '📝 Статичный текст'
+            text = (
+                f'<b>Автоответы 💬</b>\n\n'
+                f'Режим: <b>{mode_label}</b>\n\n'
+                f'<b>Статичный текст:</b>\n<code>{auto_reply_text or "не задан"}</code>\n\n'
+                f'<b>ИИ-диалог:</b>\n'
+                f'Роль: <code>{reply_role or "не задана"}</code>\n'
+                f'Промпт: <code>{reply_prompt or "не задан"}</code>\n'
+                f'Раундов: <code>{reply_max_rounds}</code>'
+            )
+            kb = [
+                [InlineKeyboardButton(
+                    f'Режим: {"→ Статичный" if reply_use_ai else "→ ИИ-диалог"}',
+                    callback_data=f'togglereplyai {session}')],
+                [InlineKeyboardButton('Статичный текст ✏️', callback_data=f'set auto_reply {session}')],
+                [InlineKeyboardButton('Роль для диалога 🤖', callback_data=f'set reply_role {session}')],
+                [InlineKeyboardButton('Промпт для диалога 📝', callback_data=f'set reply_prompt {session}')],
+                [InlineKeyboardButton(f'Раундов: {reply_max_rounds}', callback_data=f'set reply_max_rounds {session}')],
+                [InlineKeyboardButton('Очистить историю 🗑', callback_data=f'clear_reply_history {session}')],
+                [InlineKeyboardButton('Назад к аккаунту ◀️', callback_data=f'user {session}')],
+            ]
+            await callback_query.message.edit(text, reply_markup=InlineKeyboardMarkup(kb))
+
+        elif data.startswith('clear_reply_history'):
+
+            session = data.split()[1]
+            sql_edit(f"DELETE FROM reply_history WHERE session = ?", (session,))
+            await callback_query.message.edit(
+                '🗑 История диалогов очищена.',
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton('Назад ◀️', callback_data=f'autoreply_menu {session}')]]))
+
         elif data.startswith('confirmset auto_reply'):
             await callback_query.message.edit(
                 '<b>Введите новый текст для автоответчика:</b>\n\n'
@@ -1830,23 +1932,25 @@ def setup_manager(app):
                     sql_edit(f"UPDATE workers SET {data.split(' ', 2)[1]} = ? "
                              f"WHERE session = '{data.split(' ', 2)[2]}'", (info.text,))
 
-                    await callback_query.message.edit('👍 Данные обновлены')
-                    await asyncio.sleep(2)
-                    await menu(callback_query.message)
+                    session = data.split(' ', 2)[2]
+                    await callback_query.message.edit(
+                        '👍 Текст сохранён',
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton('К автоответам ◀️', callback_data=f'autoreply_menu {session}')]]))
 
                 except Exception as e:
                     await callback_query.message.edit(f'😛 Произошла ошибка\n\n<pre>{e}</pre>')
                     await remove_handler(callback_query.from_user.id)
 
             await add_handler(callback_query.from_user.id, wait)
-        
+
         elif data.startswith('no auto_reply'):
             sql_edit(f"UPDATE workers SET {data.split(' ', 2)[1]} = ? "
                      f"WHERE session = '{data.split(' ', 2)[2]}'", ('-',))
             await callback_query.message.edit(
-                'Автоответчик был отключён на этом аккаунте.',
+                'Статичный автоответ отключён.',
                 reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton('Назад к аккаунту ◀️', callback_data='user ' + data.split()[2])]]))
+                    [[InlineKeyboardButton('К автоответам ◀️', callback_data='autoreply_menu ' + data.split()[2])]]))
             
         elif data.startswith('set'):
             
@@ -1873,6 +1977,26 @@ def setup_manager(app):
                           InlineKeyboardButton('Назад ◀️', callback_data='user ' + data.split()[2])]]))
                 return
             
+            elif data.startswith('set reply_role'):
+                await callback_query.message.edit(
+                    'Введите роль для ИИ в личных сообщениях:\n\n'
+                    'Например:\n'
+                    '• <code>Вы — менеджер по продажам. Отвечайте вежливо и помогайте клиентам.</code>\n'
+                    '• <code>Вы — эксперт по недвижимости.</code>')
+
+            elif data.startswith('set reply_prompt'):
+                await callback_query.message.edit(
+                    'Введите промпт для ИИ-диалога в личных сообщениях:\n\n'
+                    'Это дополнительные инструкции поверх роли. Например:\n'
+                    '• <code>Отвечай коротко, задавай уточняющий вопрос в конце каждого сообщения.</code>\n'
+                    '• <code>Мягко веди собеседника к записи на консультацию.</code>')
+
+            elif data.startswith('set reply_max_rounds'):
+                await callback_query.message.edit(
+                    'Введите максимальное количество раундов диалога:\n\n'
+                    '• <code>3</code> — ответит 3 раза, потом замолчит\n'
+                    '• <code>0</code> — без ограничений')
+
             elif data.startswith('set delay'):
                 await callback_query.message.edit('Введите новое значение задержки, в секундах:')
 
@@ -2742,16 +2866,61 @@ def setup_worker(app):
         else:
             await app.send_chat_action(message.chat.id, ChatAction.TYPING)
             client_data = await app.get_me()
-            settings = sql_select(f"SELECT * FROM workers WHERE session = '{client_data.phone_number}' AND auto_reply != '-'")
-            if settings and settings[0][3]:
+            settings = sql_select(f"SELECT * FROM workers WHERE session = '{client_data.phone_number}'")
+            if not settings:
+                await app.send_chat_action(message.chat.id, ChatAction.CANCEL)
+                return
+
+            reply_use_ai = settings[0][14] if len(settings[0]) > 14 else 0
+            reply_role   = settings[0][15] if len(settings[0]) > 15 else None
+            reply_prompt = settings[0][16] if len(settings[0]) > 16 else None
+            reply_max_rounds = settings[0][17] if len(settings[0]) > 17 and settings[0][17] else 3
+
+            sender = f'@{message.from_user.username}' if message.from_user.username else message.from_user.first_name
+
+            if reply_use_ai and reply_role:
+                user_id = str(message.from_user.id)
+                history_rows = sql_select(
+                    f"SELECT role, content FROM reply_history "
+                    f"WHERE user_id = '{user_id}' AND session = '{client_data.phone_number}' "
+                    f"ORDER BY id ASC")
+                history = [{'role': r[0], 'content': r[1]} for r in history_rows] if history_rows else []
+
+                if reply_max_rounds > 0:
+                    assistant_count = sum(1 for h in history if h['role'] == 'assistant')
+                    if assistant_count >= reply_max_rounds:
+                        await app.send_chat_action(message.chat.id, ChatAction.CANCEL)
+                        return
+
+                user_text = message.text or ''
+                sql_edit(
+                    'INSERT INTO reply_history(user_id, session, role, content) VALUES(?, ?, ?, ?)',
+                    (user_id, client_data.phone_number, 'user', user_text))
+                history.append({'role': 'user', 'content': user_text})
+
+                await asyncio.sleep(1)
+                response = await generate_dialogue(history, reply_role, reply_prompt or '')
+                if response:
+                    await message.reply(response)
+                    sql_edit(
+                        'INSERT INTO reply_history(user_id, session, role, content) VALUES(?, ?, ?, ?)',
+                        (user_id, client_data.phone_number, 'assistant', response))
+                    round_num = sum(1 for h in history if h['role'] == 'assistant') + 1
+                    await notify(
+                        f'💬 <b>ИИ-диалог (раунд {round_num}/{reply_max_rounds if reply_max_rounds else "∞"})</b>\n\n'
+                        f'Аккаунт: {client_data.first_name}\n'
+                        f'Написал: {sender}\n'
+                        f'Сообщение: {user_text[:200]}')
+
+            elif settings[0][3] and settings[0][3] != '-':
                 await asyncio.sleep(1)
                 await message.reply(settings[0][3])
-                sender = f'@{message.from_user.username}' if message.from_user.username else message.from_user.first_name
                 await notify(
                     f'💬 <b>Автоответ отправлен</b>\n\n'
                     f'Аккаунт: {client_data.first_name}\n'
                     f'Написал: {sender}\n'
                     f'Сообщение: {(message.text or "")[:200]}')
+
             else:
                 await app.send_chat_action(message.chat.id, ChatAction.CANCEL)
 
