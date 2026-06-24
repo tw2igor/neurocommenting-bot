@@ -28,6 +28,8 @@ with sqlite3.connect("database.db") as connection:
         'ALTER TABLE workers ADD COLUMN dm_text TEXT',
         'ALTER TABLE workers ADD COLUMN dm_daily_limit INT DEFAULT 20',
         'ALTER TABLE workers ADD COLUMN dm_delay FLOAT DEFAULT 60',
+
+        'CREATE TABLE IF NOT EXISTS outreach_triggers(id INTEGER PRIMARY KEY AUTOINCREMENT, word TEXT NOT NULL, session TEXT NOT NULL)',
     ]
 
     def sql_edit(command, args):

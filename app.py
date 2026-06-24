@@ -1510,6 +1510,79 @@ def setup_manager(app):
 
             await add_handler(callback_query.from_user.id, wait)
 
+        elif data.startswith('clear_outreach_triggers'):
+
+            session = data.split()[1]
+            sql_edit('DELETE FROM outreach_triggers WHERE session = ?', (session,))
+            hint = 'Если список пустой — DM отправляется всем. Если слова заданы — только тем, чьё сообщение содержит хотя бы одно.'
+            await callback_query.message.edit(
+                f'<b>Триггерные слова 🎯</b>\n\n{hint}',
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton('Добавить слово ➕', callback_data=f'add_outreach_trigger {session}')],
+                    [InlineKeyboardButton('Назад ◀️', callback_data=f'outreach {session}')]]))
+
+        elif data.startswith('del_outreach_trigger'):
+
+            trigger_id = data.split()[1]
+            session = data.split()[2]
+            sql_edit('DELETE FROM outreach_triggers WHERE id = ? AND session = ?', (trigger_id, session))
+            triggers = sql_select(f"SELECT id, word FROM outreach_triggers WHERE session = '{session}'")
+            hint = 'Если список пустой — DM отправляется всем. Если слова заданы — только тем, чьё сообщение содержит хотя бы одно.'
+            kb = []
+            for t in triggers:
+                kb.append([InlineKeyboardButton(f'❌ {t[1]}', callback_data=f'del_outreach_trigger {t[0]} {session}')])
+            kb.append([InlineKeyboardButton('Добавить слово ➕', callback_data=f'add_outreach_trigger {session}')])
+            if triggers:
+                kb.append([InlineKeyboardButton('Очистить все 🗑', callback_data=f'clear_outreach_triggers {session}')])
+            kb.append([InlineKeyboardButton('Назад ◀️', callback_data=f'outreach {session}')])
+            await callback_query.message.edit(
+                f'<b>Триггерные слова 🎯</b>\n\n{hint}',
+                reply_markup=InlineKeyboardMarkup(kb))
+
+        elif data.startswith('add_outreach_trigger'):
+
+            session = data.split()[1]
+            await callback_query.message.edit(
+                '🎯 Введи ключевое слово или фразу.\n\n'
+                'Если сообщение пользователя в группе содержит этот текст — DM будет отправлен.')
+
+            async def wait(message):
+                await remove_handler(message.from_user.id)
+                try:
+                    await app.delete_messages(message.from_user.id, message.id)
+                except Exception:
+                    pass
+                word = message.text.strip()
+                if word:
+                    sql_edit('INSERT INTO outreach_triggers(word, session) VALUES(?, ?)', (word, session))
+                    await callback_query.message.edit(
+                        f'✅ Слово добавлено: <code>{word}</code>',
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton('К триггерным словам', callback_data=f'outreach_triggers {session}')]]))
+                else:
+                    await callback_query.message.edit(
+                        'Пустое слово не добавлено',
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton('Назад ◀️', callback_data=f'outreach_triggers {session}')]]))
+
+            await add_handler(callback_query.from_user.id, wait)
+
+        elif data.startswith('outreach_triggers'):
+
+            session = data.split()[1]
+            triggers = sql_select(f"SELECT id, word FROM outreach_triggers WHERE session = '{session}'")
+            hint = 'Если список пустой — DM отправляется всем. Если слова заданы — только тем, чьё сообщение содержит хотя бы одно.'
+            kb = []
+            for t in triggers:
+                kb.append([InlineKeyboardButton(f'❌ {t[1]}', callback_data=f'del_outreach_trigger {t[0]} {session}')])
+            kb.append([InlineKeyboardButton('Добавить слово ➕', callback_data=f'add_outreach_trigger {session}')])
+            if triggers:
+                kb.append([InlineKeyboardButton('Очистить все 🗑', callback_data=f'clear_outreach_triggers {session}')])
+            kb.append([InlineKeyboardButton('Назад ◀️', callback_data=f'outreach {session}')])
+            await callback_query.message.edit(
+                f'<b>Триггерные слова 🎯</b>\n\n{hint}',
+                reply_markup=InlineKeyboardMarkup(kb))
+
         elif data.startswith('outreach'):
 
             session = data.split()[1]
@@ -1524,12 +1597,16 @@ def setup_manager(app):
             sent_today = sql_select(
                 f"SELECT COUNT(*) FROM messaged_users WHERE session = '{session}' AND messaged_date = '{today}'")
             sent_count = sent_today[0][0] if sent_today else 0
+            triggers_count = sql_select(f"SELECT COUNT(*) FROM outreach_triggers WHERE session = '{session}'")
+            n_triggers = triggers_count[0][0] if triggers_count else 0
+            trigger_label = f'{n_triggers} сл.' if n_triggers else 'все'
 
             text = (
                 f'<b>Аутрич в ЛС 📨</b>\n\n'
                 f'Статус: {enabled_label}\n'
                 f'Отправлено сегодня: {sent_count} / {dm_daily_limit}\n'
-                f'Задержка между DM: {dm_delay} сек\n\n'
+                f'Задержка между DM: {dm_delay} сек\n'
+                f'Триггер: {trigger_label}\n\n'
                 f'Текст сообщения:\n<code>{dm_text or "не задан"}</code>'
             )
 
@@ -1539,6 +1616,7 @@ def setup_manager(app):
                 [InlineKeyboardButton(f'Лимит в день: {dm_daily_limit}', callback_data=f'set dm_daily_limit {session}'),
                  InlineKeyboardButton(f'Задержка: {dm_delay} сек', callback_data=f'set dm_delay {session}')],
                 [InlineKeyboardButton('Группы для мониторинга 🌐', callback_data=f'outreach_groups {session}')],
+                [InlineKeyboardButton(f'Триггерные слова 🎯 ({trigger_label})', callback_data=f'outreach_triggers {session}')],
                 [InlineKeyboardButton('Назад к аккаунту ◀️', callback_data=f'user {session}')]]))
 
         elif data.startswith('change'):
@@ -2608,6 +2686,12 @@ def setup_worker(app):
             f"WHERE session = '{client_data.phone_number}' AND user_id = '{user_id}'")
         if already_messaged:
             return
+
+        triggers = sql_select(f"SELECT word FROM outreach_triggers WHERE session = '{client_data.phone_number}'")
+        if triggers:
+            msg_text = (message.text or '').lower()
+            if not any(t[0].lower() in msg_text for t in triggers):
+                return
 
         await asyncio.sleep(dm_delay)
 
