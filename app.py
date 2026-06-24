@@ -248,6 +248,11 @@ def format_proxy(proxy):
                 "port": int(proxy[2]),
                 "username": proxy[3],
                 "password": proxy[4]}
+    elif len(proxy) == 4:
+        return {"scheme": proxy[0],
+                "hostname": proxy[1],
+                "port": int(proxy[2]),
+                "secret": proxy[3]}
     elif len(proxy) == 3:
         return {"scheme": proxy[0],
                 "hostname": proxy[1],

@@ -10,8 +10,9 @@ BOT_TOKEN = '123456789:AAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 # Telegram ID администраторов бота
 ADMINS = (123456789,)
 
-# Глобальный SOCKS5 прокси для всех подключений (опционально)
-# Формат: 'socks5:host:port' или 'socks5:host:port:user:pass'
+# Глобальный прокси для всех подключений (опционально)
+# SOCKS5:   'socks5:host:port' или 'socks5:host:port:user:pass'
+# MTProxy:  'mtproxy:host:port:secret'
 PROXY = None
 
 # AI API
