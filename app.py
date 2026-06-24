@@ -325,9 +325,17 @@ def setup_manager(app):
     
     @app.on_message(filters.command('start', '/'))
     async def callback(_, message):
-        
+
         if message.from_user.id in admins:
-        
+
+            try:
+                await app.set_bot_commands([
+                    BotCommand("start", "Главное меню"),
+                    BotCommand("cancel", "Отменить текущий ввод"),
+                ])
+            except Exception:
+                pass
+
             await app.delete_messages(message.chat.id, message.id)
             await app.send_message(message.from_user.id, "👮‍♀️")
             
@@ -2928,18 +2936,5 @@ def setup_worker(app):
                 await app.send_chat_action(message.chat.id, ChatAction.CANCEL)
 
 startup()
-
-async def _register_commands():
-    commands = [
-        BotCommand("start", "Главное меню"),
-        BotCommand("cancel", "Отменить текущий ввод"),
-    ]
-    for bot in manager_apps:
-        try:
-            await bot.set_bot_commands(commands)
-        except Exception as e:
-            print(f'[set_bot_commands] {e}')
-
-asyncio.get_event_loop().run_until_complete(_register_commands())
 
 compose(apps)
