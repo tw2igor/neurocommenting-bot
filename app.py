@@ -13,7 +13,7 @@ from pyrogram.errors.exceptions.bad_request_400 import MsgIdInvalid, PeerIdInval
 from pyrogram.enums import ParseMode, ChatAction
 from pyrogram.raw.functions.users import GetFullUser
 from pyrogram.raw.types import InputUser
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, BotCommand
 from pyrogram.errors import SessionPasswordNeeded
 
 from pyrogram.raw.functions.contacts import Search
@@ -2928,4 +2928,18 @@ def setup_worker(app):
                 await app.send_chat_action(message.chat.id, ChatAction.CANCEL)
 
 startup()
+
+async def _register_commands():
+    commands = [
+        BotCommand("start", "Главное меню"),
+        BotCommand("cancel", "Отменить текущий ввод"),
+    ]
+    for bot in manager_apps:
+        try:
+            await bot.set_bot_commands(commands)
+        except Exception as e:
+            print(f'[set_bot_commands] {e}')
+
+asyncio.get_event_loop().run_until_complete(_register_commands())
+
 compose(apps)
