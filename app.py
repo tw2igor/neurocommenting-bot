@@ -728,9 +728,15 @@ def setup_manager(app):
                 
                 keyboard.append(
                     [InlineKeyboardButton('Промпт 🤖', callback_data=f'set what_to_write {client_data.phone_number}')])
+                reply_max_rounds = settings[0][14] if len(settings[0]) > 14 and settings[0][14] else 1
+                rounds_labels = {1: '1 раунд', 2: '2 раунда', 3: '3 раунда'}
                 keyboard.append(
                     [InlineKeyboardButton('Роль 🤖', callback_data=f'set prompt {client_data.phone_number}'),
                      InlineKeyboardButton('Автоответ 👩‍🎓', callback_data=f'set auto_reply {client_data.phone_number}')])
+                keyboard.append(
+                    [InlineKeyboardButton(
+                        f'💬 Диалог: {rounds_labels.get(reply_max_rounds, "1 раунд")}',
+                        callback_data=f'toggledialogue {client_data.phone_number}')])
                 keyboard.append(
                     [InlineKeyboardButton(
                         f'Задержка - {settings[0][4]} ⌛', callback_data=f'set delay {client_data.phone_number}'),
@@ -861,6 +867,20 @@ def setup_manager(app):
                 await callback_query.message.edit(text, reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton('К аккаунту 👤', callback_data=f'user {data.split()[1]}')],
                     [InlineKeyboardButton('Список аккаунтов ◀️', callback_data='accounts')]]))
+
+        elif data.startswith('toggledialogue'):
+
+            session = data.split()[1]
+            current = sql_select(f"SELECT reply_max_rounds FROM workers WHERE session = '{session}'")
+            cur_val = current[0][0] if current and current[0][0] else 1
+            new_val = (cur_val % 3) + 1  # 1→2→3→1
+            sql_edit(f"UPDATE workers SET reply_max_rounds = {new_val} WHERE session = '{session}'", ())
+            rounds_labels = {1: '1 раунд', 2: '2 раунда', 3: '3 раунда'}
+            await callback_query.message.edit(
+                f'Режим диалога: <b>{rounds_labels[new_val]}</b>\n\n'
+                f'{"Отвечает один раз статичным текстом." if new_val == 1 else f"После первого статичного ответа бот поддержит диалог ещё {new_val - 1} раз(а) через ИИ."}',
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton('К аккаунту 👤', callback_data=f'user {session}')]]))
 
         elif data.startswith('switchoutreach'):
 
@@ -2744,11 +2764,39 @@ def setup_worker(app):
             client_data = await app.get_me()
             settings = sql_select(f"SELECT * FROM workers WHERE session = '{client_data.phone_number}' AND auto_reply != '-'")
             if settings and settings[0][3]:
+                reply_max_rounds = settings[0][14] if len(settings[0]) > 14 and settings[0][14] else 1
+                user_id = str(message.from_user.id)
+                state = sql_select(
+                    f"SELECT round FROM reply_state "
+                    f"WHERE user_id = '{user_id}' AND session = '{client_data.phone_number}'")
+                current_round = state[0][0] if state else 0
+
+                if current_round >= reply_max_rounds:
+                    await app.send_chat_action(message.chat.id, ChatAction.CANCEL)
+                    return
+
                 await asyncio.sleep(1)
-                await message.reply(settings[0][3])
+
+                if current_round == 0:
+                    await message.reply(settings[0][3])
+                    sql_edit(
+                        'INSERT INTO reply_state(user_id, session, round) VALUES(?, ?, 1)',
+                        (user_id, client_data.phone_number))
+                else:
+                    dialogue_prompt = (
+                        f'Тебе написали в личку: "{(message.text or "")[:500]}". '
+                        f'Поддержи разговор естественно, можешь задать вопрос или проявить интерес. '
+                        f'Ответ до 30 слов.')
+                    response = await generate_response(dialogue_prompt, settings[0][2], app)
+                    await message.reply(response)
+                    sql_edit(
+                        f"UPDATE reply_state SET round = {current_round + 1} "
+                        f"WHERE user_id = '{user_id}' AND session = '{client_data.phone_number}'",
+                        ())
+
                 sender = f'@{message.from_user.username}' if message.from_user.username else message.from_user.first_name
                 await notify(
-                    f'💬 <b>Автоответ отправлен</b>\n\n'
+                    f'💬 <b>Автоответ (раунд {current_round + 1}/{reply_max_rounds})</b>\n\n'
                     f'Аккаунт: {client_data.first_name}\n'
                     f'Написал: {sender}\n'
                     f'Сообщение: {(message.text or "")[:200]}')
