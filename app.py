@@ -2827,6 +2827,9 @@ def setup_worker(app):
             sql_edit(
                 'INSERT INTO messaged_users(user_id, session, messaged_date) VALUES(?, ?, ?)',
                 (user_id, client_data.phone_number, today))
+            sql_edit(
+                'INSERT INTO reply_history(user_id, session, role, content) VALUES(?, ?, ?, ?)',
+                (user_id, client_data.phone_number, 'assistant', dm_text))
             sender_name = message.from_user.username or message.from_user.first_name
             await notify(
                 f'📨 <b>Аутрич DM отправлен</b>\n\n'
