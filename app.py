@@ -21,7 +21,11 @@ from pyrogram.raw.functions.contacts import Search
 from handlers import add_handler, remove_handler, is_handler
 from menus import pretexts_menu
 from sqlite_functions import sql_select, sql_edit, core_commands
-from config import API_ID, API_HASH, BOT_ID, BOT_LINK, BOT_TOKEN, ADMINS, TIMEWEB_TOKEN, TIMEWEB_AGENT_ID, PROXY
+from config import API_ID, API_HASH, BOT_ID, BOT_LINK, BOT_TOKEN, ADMINS, TIMEWEB_TOKEN, TIMEWEB_AGENT_ID
+try:
+    from config import PROXY
+except ImportError:
+    PROXY = None
 
 # важное
 
