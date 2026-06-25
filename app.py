@@ -36,6 +36,8 @@ conversation_history = ["Привет, как дела?", "Все отлично
 
 admins = ADMINS
 
+MAIN_KEYBOARD = ReplyKeyboardMarkup([['Мои аккаунты 🙂'], ['Меню 🌴']], resize_keyboard=True)
+
 # костыль для остановки парсинга, потом перепишу
 
 working = False
@@ -418,7 +420,7 @@ def setup_manager(app):
             
             if message.text == 'Отмена ❌':
                 sent2 = await app.send_message(message.from_user.id, "❌ Отменено",
-                                               reply_markup=ReplyKeyboardRemove())
+                                               reply_markup=MAIN_KEYBOARD)
                 await asyncio.sleep(2)
                 await app.delete_messages(sent2.chat.id, sent2.id)
                 return
@@ -487,17 +489,21 @@ def setup_manager(app):
                 "Введите SOCKS5 прокси в формате ниже:\n\n<code>scheme:ip:port:username:password</code>\n\n"
                 "Пример: socks5:45.145.57.238:10253:ucXRvV:dcEscZ"
                 "\n\n<i>/cancel для отмены</i>",
-                reply_markup=ReplyKeyboardMarkup([['Без прокси']], resize_keyboard=True))
-            
+                reply_markup=ReplyKeyboardMarkup([['Без прокси'], ['Отмена ❌']], resize_keyboard=True))
+
             async def wait_for(proxy):
-                
+
                 await remove_handler(document.from_user.id)
-                
+
                 await app.delete_messages(sent2.chat.id, sent2.id)
                 await app.delete_messages(proxy.chat.id, proxy.id)
-                
+
+                if proxy.text == 'Отмена ❌':
+                    await app.send_message(document.from_user.id, '❌ Отменено', reply_markup=MAIN_KEYBOARD)
+                    return
+
                 try:
-                    
+
                     if proxy.text == 'Без прокси':
                         client = Client(document.document.file_name[:-8], api_id=API_ID, api_hash=API_HASH, proxy=GLOBAL_PROXY)
                     
@@ -569,7 +575,7 @@ def setup_manager(app):
                 
                 except Exception as e:
                     await app.send_message(document.from_user.id, f'😛 Произошла ошибка\n\n<pre>{e}</pre>',
-                                           reply_markup=ReplyKeyboardRemove())
+                                           reply_markup=MAIN_KEYBOARD)
             
             await add_handler(document.from_user.id, wait_for)
             
@@ -1153,12 +1159,16 @@ def setup_manager(app):
 
                     await callback_query.message.reply(
                         'С каким промежутком добавлть людей? Для рандомного выбора напишите промежуток в таком формате: 1-5 (от 1й до 5ти сек)',
-                    reply_markup=ReplyKeyboardMarkup([['Без задержки']]))
-
+                    reply_markup=ReplyKeyboardMarkup([['Без задержки'], ['Отмена ❌']], resize_keyboard=True))
 
                     async def wait3(timeout):
 
                         await remove_handler(channel_text.from_user.id)
+
+                        if timeout.text == 'Отмена ❌':
+                            await app.send_message(timeout.from_user.id, '❌ Отменено', reply_markup=MAIN_KEYBOARD)
+                            return
+
                         spl = timeout.text.split('-')
 
                         async def count_cooldown():
@@ -1173,7 +1183,7 @@ def setup_manager(app):
                             return secs
 
                         res_msg = await callback_query.message.reply('Запустили инвайтинг!',
-                                                                     reply_markup=ReplyKeyboardRemove())
+                                                                     reply_markup=MAIN_KEYBOARD)
 
                         total = 0
                         successes = 0
@@ -1250,9 +1260,13 @@ def setup_manager(app):
 
                     await callback_query.message.reply(
                         'С каким промежутком рассылать сообщения? Для рандомного выбора напишите промежуток в таком формате: 1-5 (от 1й до 5ти сек)',
-                    reply_markup=ReplyKeyboardMarkup([['Без задержки']]))
+                    reply_markup=ReplyKeyboardMarkup([['Без задержки'], ['Отмена ❌']], resize_keyboard=True))
 
                     async def wait3(timeout):
+
+                        if timeout.text == 'Отмена ❌':
+                            await app.send_message(timeout.from_user.id, '❌ Отменено', reply_markup=MAIN_KEYBOARD)
+                            return
 
                         spl = timeout.text.split('-')
 
@@ -2080,7 +2094,7 @@ def setup_manager(app):
                     
                     sent2 = await app.send_message(callback_query.from_user.id,
                                                   "❌ Отменено",
-                                                  reply_markup=ReplyKeyboardRemove())
+                                                  reply_markup=MAIN_KEYBOARD)
                     await asyncio.sleep(2)
                     await app.delete_messages(sent2.chat.id, sent2.id)
                     return
@@ -2096,7 +2110,7 @@ def setup_manager(app):
                     
                     sql_edit('INSERT INTO managers(token) VALUES(?)', (token.text,))
                     sent2 = await app.send_message(callback_query.from_user.id, "👌 Бот подключен",
-                                                   reply_markup=ReplyKeyboardRemove())
+                                                   reply_markup=MAIN_KEYBOARD)
                     await asyncio.sleep(2)
                     await app.delete_messages(sent2.chat.id, sent2.id)
                 
@@ -2121,7 +2135,7 @@ def setup_manager(app):
 
                 if message.text == 'Отмена ❌':
                     sent2 = await app.send_message(callback_query.from_user.id, "❌ Отменено",
-                                                   reply_markup=ReplyKeyboardRemove())
+                                                   reply_markup=MAIN_KEYBOARD)
                     await asyncio.sleep(2)
                     try:
                         await app.delete_messages(sent2.chat.id, sent2.id)
@@ -2194,7 +2208,7 @@ def setup_manager(app):
 
                 if message.text == 'Отмена ❌':
                     sent2 = await app.send_message(callback_query.from_user.id, "❌ Отменено",
-                                                   reply_markup=ReplyKeyboardRemove())
+                                                   reply_markup=MAIN_KEYBOARD)
                     await asyncio.sleep(2)
                     try:
                         await app.delete_messages(sent2.chat.id, sent2.id)
@@ -2305,7 +2319,7 @@ def setup_manager(app):
                 
                 if channel_message.text == 'Отмена ❌':
                     sent2 = await app.send_message(
-                        callback_query.from_user.id, "❌ Отменено", reply_markup=ReplyKeyboardRemove())
+                        callback_query.from_user.id, "❌ Отменено", reply_markup=MAIN_KEYBOARD)
                     await asyncio.sleep(1.1)
                     await app.delete_messages(sent2.chat.id, sent2.id)
                     return
@@ -2353,7 +2367,7 @@ def setup_manager(app):
                     sent2 = await app.send_message(
                         callback_query.from_user.id,
                         result_text,
-                        reply_markup=ReplyKeyboardRemove())
+                        reply_markup=MAIN_KEYBOARD)
                     await asyncio.sleep(3)
                     try:
                         await app.delete_messages(sent2.chat.id, sent2.id)
@@ -2382,7 +2396,7 @@ def setup_manager(app):
 
                     sent2 = await app.send_message(callback_query.from_user.id,
                                                    "❌ Отменено",
-                                                   reply_markup=ReplyKeyboardRemove())
+                                                   reply_markup=MAIN_KEYBOARD)
                     await asyncio.sleep(2)
                     await app.delete_messages(sent2.chat.id, sent2.id)
                     return
@@ -2394,7 +2408,7 @@ def setup_manager(app):
                     F.close()
 
                     sent2 = await app.send_message(callback_query.from_user.id, "👌 Токен изменён",
-                                                   reply_markup=ReplyKeyboardRemove())
+                                                   reply_markup=MAIN_KEYBOARD)
                     await asyncio.sleep(2)
                     await app.delete_messages(sent2.chat.id, sent2.id)
 
@@ -2420,7 +2434,7 @@ def setup_manager(app):
 
                     sent2 = await app.send_message(callback_query.from_user.id,
                                                    "❌ Отменено",
-                                                   reply_markup=ReplyKeyboardRemove())
+                                                   reply_markup=MAIN_KEYBOARD)
                     await asyncio.sleep(2)
                     await app.delete_messages(sent2.chat.id, sent2.id)
                     return
@@ -2432,7 +2446,7 @@ def setup_manager(app):
                     f.close()
 
                     sent2 = await app.send_message(callback_query.from_user.id, "👌 Agent ID изменён",
-                                                   reply_markup=ReplyKeyboardRemove())
+                                                   reply_markup=MAIN_KEYBOARD)
                     await asyncio.sleep(2)
                     await app.delete_messages(sent2.chat.id, sent2.id)
 
@@ -2491,7 +2505,7 @@ def setup_manager(app):
                         await app.send_message(
                             callback_query.from_user.id,
                             "👇 Введите код, который прислал Telegram",
-                            reply_markup=ReplyKeyboardRemove())
+                            reply_markup=ReplyKeyboardMarkup([['Отмена ❌']], resize_keyboard=True))
                         
                         async def wait_for_the(code):
                             await remove_handler(callback_query.from_user.id)
