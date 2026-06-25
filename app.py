@@ -2946,7 +2946,8 @@ def setup_worker(app):
                         f'💬 <b>ИИ-диалог (раунд {round_num}/{reply_max_rounds if reply_max_rounds else "∞"})</b>\n\n'
                         f'Аккаунт: {client_data.first_name}\n'
                         f'Написал: {sender}\n'
-                        f'Сообщение: {user_text[:200]}')
+                        f'Сообщение: {user_text[:200]}\n\n'
+                        f'Ответ: {response[:300]}')
 
             elif settings[0][3] and settings[0][3] != '-':
                 await asyncio.sleep(1)
@@ -2955,7 +2956,8 @@ def setup_worker(app):
                     f'💬 <b>Автоответ отправлен</b>\n\n'
                     f'Аккаунт: {client_data.first_name}\n'
                     f'Написал: {sender}\n'
-                    f'Сообщение: {(message.text or "")[:200]}')
+                    f'Сообщение: {(message.text or "")[:200]}\n\n'
+                    f'Ответ: {settings[0][3][:300]}')
 
             else:
                 await app.send_chat_action(message.chat.id, ChatAction.CANCEL)
