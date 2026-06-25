@@ -120,8 +120,8 @@ async def menu(message):
         keyboard.append([InlineKeyboardButton('Поиск каналов 🔎', callback_data='search')])
     
     keyboard.append([InlineKeyboardButton('Канал уведомлений 🥰', callback_data='service channel')])
-    keyboard.append([InlineKeyboardButton('Токен Timeweb AI ♻️', callback_data='token')])
-    keyboard.append([InlineKeyboardButton('Agent ID Timeweb AI 🖥️', callback_data='proxy')])
+    keyboard.append([InlineKeyboardButton('Токен AI ♻️', callback_data='token')])
+    keyboard.append([InlineKeyboardButton('Agent ID AI 🖥️', callback_data='proxy')])
     keyboard.append([InlineKeyboardButton('Новый бот для управления 🤖', callback_data='bot')])
     keyboard.append([InlineKeyboardButton('Добавить аккаунт 👮‍♀️', callback_data='+')])
     
@@ -210,7 +210,7 @@ async def generate_response(prompt, role, app):
             for admin in admins:
                 try:
                     await app.send_message(
-                        admin, f'Ошибка при запросе к Timeweb AI: [{gptreq.status_code}] {gptreq.json()["error"]["message"]}')
+                        admin, f'Ошибка при запросе к AI: [{gptreq.status_code}] {gptreq.json()["error"]["message"]}')
                 except:
                     pass
 
@@ -427,7 +427,7 @@ def setup_manager(app):
                 if workers_list:
                     
                     notification = await msg.reply(
-                        'Ждём, пока Timeweb AI подберёт ключевые слова... 😊')
+                        'Ждём, пока AI подберёт ключевые слова... 😊')
                     
                     keywords = generate_keywords(message.text)
                     keywords = keywords.split('\n')
@@ -2133,7 +2133,7 @@ def setup_manager(app):
                     if workers_list:
                         
                         notification = await callback_query.message.reply(
-                            'Ждём, пока Timeweb AI подберёт ключевые слова... 😊')
+                            'Ждём, пока AI подберёт ключевые слова... 😊')
                         
 
                         keywords = generate_keywords(message.text)
@@ -2369,7 +2369,7 @@ def setup_manager(app):
         elif data.startswith('token'):
             
             sent = await app.send_message(callback_query.from_user.id,
-                                          "🤖 Введите Bearer-токен Timeweb AI:",
+                                          "🤖 Введите Bearer-токен AI:",
                                           reply_markup=ReplyKeyboardMarkup([['Отмена ❌']], resize_keyboard=True))
 
             async def wait(token):
@@ -2407,7 +2407,7 @@ def setup_manager(app):
             
             sent = await app.send_message(
                 callback_query.from_user.id,
-                "🤖 Введите Agent Access ID из кабинета Timeweb AI:",
+                "🤖 Введите Agent Access ID:",
                 reply_markup=ReplyKeyboardMarkup([['Отмена ❌']], resize_keyboard=True))
 
             async def wait(token):
