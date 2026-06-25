@@ -116,7 +116,7 @@ async def menu(message):
     #         continue
     
     if workers_list:
-        keyboard.append([InlineKeyboardButton('Спарсить комменты 💬', callback_data='parse_comments')])
+        keyboard.append([InlineKeyboardButton('Спарсить юзеров в коментах 💬', callback_data='parse_comments')])
         keyboard.append([InlineKeyboardButton('Поиск каналов 🔎', callback_data='search')])
     
     keyboard.append([InlineKeyboardButton('Канал уведомлений 🥰', callback_data='service channel')])
