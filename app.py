@@ -88,7 +88,7 @@ async def accounts(message):
             await message.reply(f'Ошибка при получении информации об аккаунте<pre>{e}</pre>')
             continue
 
-    keyboard.append([InlineKeyboardButton('Добавить аккаунт 👮‍♀️', callback_data='+')])
+    keyboard.append([InlineKeyboardButton('Добавить аккаунт 🤓', callback_data='+')])
     
     await message.edit(
         "<b>Список ваших аккаунтов</b>\n\nДля настройки аккаунта нажмите на его ник",
@@ -123,7 +123,7 @@ async def menu(message):
     keyboard.append([InlineKeyboardButton('Токен AI ♻️', callback_data='token')])
     keyboard.append([InlineKeyboardButton('Agent ID AI 🖥️', callback_data='proxy')])
     keyboard.append([InlineKeyboardButton('Новый бот для управления 🤖', callback_data='bot')])
-    keyboard.append([InlineKeyboardButton('Добавить аккаунт 👮‍♀️', callback_data='+')])
+    keyboard.append([InlineKeyboardButton('Добавить аккаунт 🤓', callback_data='+')])
     
     await message.edit(
         "Список ваших аккаунтов:",
@@ -348,7 +348,7 @@ def setup_manager(app):
                 pass
 
             await app.delete_messages(message.chat.id, message.id)
-            await app.send_message(message.from_user.id, "👮‍♀️")
+            await app.send_message(message.from_user.id, "🤓")
             
             await app.send_message(message.from_user.id, "Ваше меню:", reply_markup=ReplyKeyboardMarkup(
                 [['Мои аккаунты 🙂'], ['Меню 🌴'],
