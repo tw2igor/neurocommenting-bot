@@ -35,6 +35,7 @@ with sqlite3.connect("database.db") as connection:
         'ALTER TABLE workers ADD COLUMN reply_role TEXT',
         'ALTER TABLE workers ADD COLUMN reply_prompt TEXT',
         'ALTER TABLE workers ADD COLUMN reply_max_rounds INT DEFAULT 3',
+        'ALTER TABLE workers ADD COLUMN reply_delay FLOAT DEFAULT 1',
         'CREATE TABLE IF NOT EXISTS reply_history(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, session TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL)',
     ]
 

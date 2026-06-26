@@ -1875,11 +1875,12 @@ def setup_manager(app):
         elif data.startswith('autoreply_menu'):
 
             session = data.split()[1]
-            s = sql_select(f"SELECT auto_reply, reply_use_ai, reply_role, reply_prompt, reply_max_rounds FROM workers WHERE session = '{session}'")
+            s = sql_select(f"SELECT auto_reply, reply_use_ai, reply_role, reply_prompt, reply_max_rounds, reply_delay FROM workers WHERE session = '{session}'")
             if not s:
                 return
-            auto_reply_text, reply_use_ai, reply_role, reply_prompt, reply_max_rounds = s[0]
+            auto_reply_text, reply_use_ai, reply_role, reply_prompt, reply_max_rounds, reply_delay = s[0]
             reply_max_rounds = reply_max_rounds or 3
+            reply_delay = reply_delay if reply_delay is not None else 1
             mode_label = '🤖 ИИ-диалог' if reply_use_ai else '📝 Статичный текст'
             text = (
                 f'<b>Автоответы 💬</b>\n\n'
@@ -1888,7 +1889,8 @@ def setup_manager(app):
                 f'<b>ИИ-диалог:</b>\n'
                 f'Роль: <code>{reply_role or "не задана"}</code>\n'
                 f'Промпт: <code>{reply_prompt or "не задан"}</code>\n'
-                f'Раундов: <code>{reply_max_rounds}</code>'
+                f'Раундов: <code>{reply_max_rounds}</code>\n\n'
+                f'Задержка: <code>{reply_delay} сек</code>'
             )
             kb = [
                 [InlineKeyboardButton(
@@ -1897,7 +1899,8 @@ def setup_manager(app):
                 [InlineKeyboardButton('Статичный текст ✏️', callback_data=f'set auto_reply {session}')],
                 [InlineKeyboardButton('Роль для диалога 🤖', callback_data=f'set reply_role {session}')],
                 [InlineKeyboardButton('Промпт для диалога 📝', callback_data=f'set reply_prompt {session}')],
-                [InlineKeyboardButton(f'Раундов: {reply_max_rounds}', callback_data=f'set reply_max_rounds {session}')],
+                [InlineKeyboardButton(f'Раундов: {reply_max_rounds}', callback_data=f'set reply_max_rounds {session}'),
+                 InlineKeyboardButton(f'Задержка: {reply_delay} сек ⏱', callback_data=f'set reply_delay {session}')],
                 [InlineKeyboardButton('Очистить историю 🗑', callback_data=f'clear_reply_history {session}')],
                 [InlineKeyboardButton('Назад к аккаунту ◀️', callback_data=f'user {session}')],
             ]
@@ -1912,11 +1915,12 @@ def setup_manager(app):
             callback_query.data = f'autoreply_menu {session}'
             data = callback_query.data
 
-            s = sql_select(f"SELECT auto_reply, reply_use_ai, reply_role, reply_prompt, reply_max_rounds FROM workers WHERE session = '{session}'")
+            s = sql_select(f"SELECT auto_reply, reply_use_ai, reply_role, reply_prompt, reply_max_rounds, reply_delay FROM workers WHERE session = '{session}'")
             if not s:
                 return
-            auto_reply_text, reply_use_ai, reply_role, reply_prompt, reply_max_rounds = s[0]
+            auto_reply_text, reply_use_ai, reply_role, reply_prompt, reply_max_rounds, reply_delay = s[0]
             reply_max_rounds = reply_max_rounds or 3
+            reply_delay = reply_delay if reply_delay is not None else 1
             mode_label = '🤖 ИИ-диалог' if reply_use_ai else '📝 Статичный текст'
             text = (
                 f'<b>Автоответы 💬</b>\n\n'
@@ -1925,7 +1929,8 @@ def setup_manager(app):
                 f'<b>ИИ-диалог:</b>\n'
                 f'Роль: <code>{reply_role or "не задана"}</code>\n'
                 f'Промпт: <code>{reply_prompt or "не задан"}</code>\n'
-                f'Раундов: <code>{reply_max_rounds}</code>'
+                f'Раундов: <code>{reply_max_rounds}</code>\n\n'
+                f'Задержка: <code>{reply_delay} сек</code>'
             )
             kb = [
                 [InlineKeyboardButton(
@@ -1934,7 +1939,8 @@ def setup_manager(app):
                 [InlineKeyboardButton('Статичный текст ✏️', callback_data=f'set auto_reply {session}')],
                 [InlineKeyboardButton('Роль для диалога 🤖', callback_data=f'set reply_role {session}')],
                 [InlineKeyboardButton('Промпт для диалога 📝', callback_data=f'set reply_prompt {session}')],
-                [InlineKeyboardButton(f'Раундов: {reply_max_rounds}', callback_data=f'set reply_max_rounds {session}')],
+                [InlineKeyboardButton(f'Раундов: {reply_max_rounds}', callback_data=f'set reply_max_rounds {session}'),
+                 InlineKeyboardButton(f'Задержка: {reply_delay} сек ⏱', callback_data=f'set reply_delay {session}')],
                 [InlineKeyboardButton('Очистить историю 🗑', callback_data=f'clear_reply_history {session}')],
                 [InlineKeyboardButton('Назад к аккаунту ◀️', callback_data=f'user {session}')],
             ]
@@ -2029,6 +2035,12 @@ def setup_manager(app):
                     'Введите максимальное количество раундов диалога:\n\n'
                     '• <code>3</code> — ответит 3 раза, потом замолчит\n'
                     '• <code>0</code> — без ограничений')
+
+            elif data.startswith('set reply_delay'):
+                await callback_query.message.edit(
+                    'Введите задержку перед автоответом в секундах:\n\n'
+                    '• <code>0</code> — без задержки\n'
+                    '• <code>5</code> — подождёт 5 секунд перед ответом')
 
             elif data.startswith('set delay'):
                 await callback_query.message.edit('Введите новое значение задержки, в секундах:')
@@ -2911,6 +2923,7 @@ def setup_worker(app):
             reply_role   = settings[0][15] if len(settings[0]) > 15 else None
             reply_prompt = settings[0][16] if len(settings[0]) > 16 else None
             reply_max_rounds = settings[0][17] if len(settings[0]) > 17 and settings[0][17] else 3
+            reply_delay  = settings[0][18] if len(settings[0]) > 18 and settings[0][18] is not None else 1
 
             sender = f'@{message.from_user.username}' if message.from_user.username else message.from_user.first_name
 
@@ -2934,7 +2947,7 @@ def setup_worker(app):
                     (user_id, client_data.phone_number, 'user', user_text))
                 history.append({'role': 'user', 'content': user_text})
 
-                await asyncio.sleep(1)
+                await asyncio.sleep(reply_delay)
                 response = await generate_dialogue(history, reply_role, reply_prompt or '')
                 if response:
                     await message.reply(response)
@@ -2950,7 +2963,7 @@ def setup_worker(app):
                         f'Ответ: {response[:300]}')
 
             elif settings[0][3] and settings[0][3] != '-':
-                await asyncio.sleep(1)
+                await asyncio.sleep(reply_delay)
                 await message.reply(settings[0][3])
                 await notify(
                     f'💬 <b>Автоответ отправлен</b>\n\n'
