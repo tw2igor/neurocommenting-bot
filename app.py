@@ -792,8 +792,10 @@ def setup_manager(app):
                     [InlineKeyboardButton('Добавить каналы 💬', callback_data=f'newchannels {client_data.phone_number} comments'),
                      InlineKeyboardButton('Удалить аккаунт ❌', callback_data=f'del {client_data.phone_number}')])
                 
+                min_post_length = settings[0][19] if len(settings[0]) > 19 and settings[0][19] else 0
                 keyboard.append(
-                    [InlineKeyboardButton(f'Комментировать первым {be_first}', callback_data=f'switchbefirst {client_data.phone_number}')])
+                    [InlineKeyboardButton(f'Комментировать первым {be_first}', callback_data=f'switchbefirst {client_data.phone_number}'),
+                     InlineKeyboardButton(f'Мин. символов: {min_post_length or "нет"} 📏', callback_data=f'set min_post_length {client_data.phone_number}')])
 
 
                 if settings[0][9] == 1:
@@ -2042,6 +2044,12 @@ def setup_manager(app):
                     '• <code>0</code> — без задержки\n'
                     '• <code>5</code> — подождёт 5 секунд перед ответом')
 
+            elif data.startswith('set min_post_length'):
+                await callback_query.message.edit(
+                    'Введите минимальное количество символов в посте для комментирования:\n\n'
+                    '• <code>0</code> — комментировать любые посты\n'
+                    '• <code>100</code> — пропускать посты короче 100 символов')
+
             elif data.startswith('set delay'):
                 await callback_query.message.edit('Введите новое значение задержки, в секундах:')
 
@@ -2642,15 +2650,12 @@ def setup_worker(app):
                 
                 await asyncio.sleep(settings[0][4])
                 
-                if random.randint(1, settings[0][5]) == 1 and SENT_TODAY < LIMIT and (message.text or message.caption):
-                    
+                post = message.caption or message.text or ''
+                min_post_length = settings[0][19] if len(settings[0]) > 19 and settings[0][19] else 0
+
+                if random.randint(1, settings[0][5]) == 1 and SENT_TODAY < LIMIT and post and len(post) >= min_post_length:
 
                     service_channel = sql_select('SELECT channel FROM managers')
-                    
-                    if message.caption:
-                        post = message.caption
-                    else:
-                        post = message.text
                     
                     try:
                         message = await app.get_discussion_message(message.sender_chat.id, message.id)
@@ -2762,11 +2767,13 @@ def setup_worker(app):
 
         await asyncio.sleep(settings[0][4])
 
-        if random.randint(1, settings[0][5]) != 1 or SENT_TODAY >= LIMIT:
+        post = message.caption or message.text or ''
+        min_post_length = settings[0][19] if len(settings[0]) > 19 and settings[0][19] else 0
+
+        if random.randint(1, settings[0][5]) != 1 or SENT_TODAY >= LIMIT or len(post) < min_post_length:
             return
 
         service_channel = sql_select('SELECT channel FROM managers')
-        post = message.caption if message.caption else message.text
 
         try:
             if settings[0][9] == 1:
