@@ -38,6 +38,11 @@ with sqlite3.connect("database.db") as connection:
         'ALTER TABLE workers ADD COLUMN reply_delay FLOAT DEFAULT 1',
         'ALTER TABLE workers ADD COLUMN min_post_length INT DEFAULT 0',
         'CREATE TABLE IF NOT EXISTS reply_history(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, session TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL)',
+
+        'CREATE TABLE IF NOT EXISTS broadcast_chats(id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id TEXT NOT NULL, chat_title TEXT, session TEXT NOT NULL)',
+        'ALTER TABLE workers ADD COLUMN broadcast_enabled INT DEFAULT 0',
+        'ALTER TABLE workers ADD COLUMN broadcast_text TEXT',
+        'ALTER TABLE workers ADD COLUMN broadcast_interval TEXT DEFAULT "600-1500"',
     ]
 
     def sql_edit(command, args):

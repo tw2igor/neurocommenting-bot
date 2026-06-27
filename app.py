@@ -3,7 +3,7 @@ import random
 import os
 import requests
 import xlsxwriter
-from datetime import date
+from datetime import date, datetime, timezone, timedelta
 
 from pyrogram import Client, filters, compose
 from pyrogram.errors import FloodWait, UserDeactivatedBan, AuthKeyDuplicated, AuthKeyUnregistered, Forbidden, UserAlreadyParticipant
@@ -826,7 +826,10 @@ def setup_manager(app):
                 keyboard.append(
                     [InlineKeyboardButton('Рассылка по лс 🌪',
                                           callback_data=f'spam_dms {client_data.phone_number}')])
-                
+                keyboard.append(
+                    [InlineKeyboardButton('Рассылка в чаты 📢',
+                                          callback_data=f'broadcast {client_data.phone_number}')])
+
                 keyboard.append([InlineKeyboardButton('Все Аккаунты ◀️', callback_data='accounts')])
                 
                 await callback_query.message.edit(reply_text, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -1681,6 +1684,102 @@ def setup_manager(app):
                 [InlineKeyboardButton(f'Триггерные слова 🎯 ({trigger_label})', callback_data=f'outreach_triggers {session}')],
                 [InlineKeyboardButton('Назад к аккаунту ◀️', callback_data=f'user {session}')]]))
 
+        elif data.startswith('togglebroadcast '):
+
+            session = data.split()[1]
+            cur = sql_select(f"SELECT broadcast_enabled FROM workers WHERE session = '{session}'")
+            new_val = 0 if (cur and cur[0][0]) else 1
+            sql_edit("UPDATE workers SET broadcast_enabled = ? WHERE session = ?", (new_val, session))
+            callback_query.data = f'broadcast {session}'
+            data = callback_query.data
+
+        if data.startswith('broadcast ') and len(data.split()) == 2:
+
+            session = data.split()[1]
+            s = sql_select(f"SELECT broadcast_enabled, broadcast_text, broadcast_interval FROM workers WHERE session = '{session}'")
+            if not s:
+                return
+            enabled, text, interval = s[0]
+            interval = interval or '600-1500'
+            chats_count = sql_select(f"SELECT COUNT(*) FROM broadcast_chats WHERE session = '{session}'")[0][0]
+            status = '✅ Включена' if enabled else '❌ Выключена'
+            await callback_query.message.edit(
+                f'<b>Рассылка в чаты 📢</b>\n\n'
+                f'Статус: <b>{status}</b>\n'
+                f'Интервал: <b>{interval} сек</b>\n'
+                f'Чатов: <b>{chats_count}</b>\n'
+                f'Активна: <b>10:00 – 18:00 МСК</b>\n\n'
+                f'Текст:\n<code>{text or "не задан"}</code>',
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton('Выключить ❌' if enabled else 'Включить ✅',
+                                          callback_data=f'togglebroadcast {session}')],
+                    [InlineKeyboardButton('Текст сообщения ✏️', callback_data=f'set broadcast_text {session}')],
+                    [InlineKeyboardButton(f'Интервал: {interval} сек ⏱',
+                                          callback_data=f'set broadcast_interval {session}')],
+                    [InlineKeyboardButton('Список чатов 📋', callback_data=f'broadcast_chats {session}')],
+                    [InlineKeyboardButton('Назад к аккаунту ◀️', callback_data=f'user {session}')],
+                ]))
+
+        elif data.startswith('del_broadcast_chat '):
+
+            chat_id = data.split()[1]
+            session = data.split()[2]
+            sql_edit('DELETE FROM broadcast_chats WHERE chat_id = ? AND session = ?', (chat_id, session))
+            callback_query.data = f'broadcast_chats {session}'
+            data = callback_query.data
+
+        if data.startswith('broadcast_chats '):
+
+            session = data.split()[1]
+            chats = sql_select(f"SELECT chat_id, chat_title FROM broadcast_chats WHERE session = '{session}'")
+            kb = []
+            for chat in (chats or []):
+                title = chat[1] or chat[0]
+                kb.append([InlineKeyboardButton(f'❌ {title}',
+                                                callback_data=f'del_broadcast_chat {chat[0]} {session}')])
+            kb.append([InlineKeyboardButton('Добавить чат ➕', callback_data=f'add_broadcast_chat {session}')])
+            kb.append([InlineKeyboardButton('Назад ◀️', callback_data=f'broadcast {session}')])
+            await callback_query.message.edit(
+                '<b>Чаты для рассылки 📋</b>\n\nНажми на чат чтобы удалить его из списка',
+                reply_markup=InlineKeyboardMarkup(kb))
+
+        elif data.startswith('add_broadcast_chat '):
+
+            session = data.split()[1]
+            await callback_query.message.edit('📢 Введите ссылку на чат или @username:')
+
+            async def wait(message):
+                await remove_handler(message.from_user.id)
+                try:
+                    await app.delete_messages(message.from_user.id, message.id)
+                except Exception:
+                    pass
+
+                link = message.text.strip()
+                if link.startswith('https://t.me/'):
+                    link = link[13:]
+                elif link.startswith('t.me/'):
+                    link = link[5:]
+                elif link.startswith('@'):
+                    link = link[1:]
+
+                try:
+                    chat = await workers_list[session].get_chat(link)
+                    sql_edit(
+                        'INSERT INTO broadcast_chats(chat_id, chat_title, session) VALUES(?, ?, ?)',
+                        (str(chat.id), chat.title, session))
+                    await callback_query.message.edit(
+                        f'✅ Чат добавлен: <b>{chat.title}</b>',
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton('К списку чатов', callback_data=f'broadcast_chats {session}')]]))
+                except Exception as e:
+                    await callback_query.message.edit(
+                        f'😛 Не удалось добавить чат\n\n<pre>{e}</pre>',
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton('Назад ◀️', callback_data=f'broadcast {session}')]]))
+
+            await add_handler(callback_query.from_user.id, wait)
+
         elif data.startswith('change'):
 
             client = workers_list[data.split(" ", 2)[1]]
@@ -2062,6 +2161,20 @@ def setup_manager(app):
             elif data.startswith('set dm_delay'):
                 await callback_query.message.edit('Введите задержку между DM в секундах:')
 
+            elif data.startswith('set broadcast_text'):
+                await callback_query.message.edit(
+                    'Введите текст сообщения для рассылки:',
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton('Отмена ✖️', callback_data=f'broadcast {data.split()[2]}')]]))
+
+            elif data.startswith('set broadcast_interval'):
+                await callback_query.message.edit(
+                    'Введите интервал между сообщениями в секундах в формате <b>мин-макс</b>:\n\n'
+                    '• <code>600-1500</code> — от 10 до 25 минут\n'
+                    '• <code>3600-7800</code> — от 1 до 2.1 часа',
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton('Отмена ✖️', callback_data=f'broadcast {data.split()[2]}')]]))
+
             elif data.startswith('set chance'):
                 await callback_query.message.edit('Введите шанс, с которым будут оставляться комментарии\n\n'
                                                   'Если хотите 33%, введите 3 (1к<b>3</b>)\n'
@@ -2074,22 +2187,24 @@ def setup_manager(app):
                 except Exception:
                     pass
 
+                field = data.split(' ', 2)[1]
+                session = data.split(' ', 2)[2]
+                back_cb = f'broadcast {session}' if field.startswith('broadcast_') else f'user {session}'
+                back_label = 'Назад к рассылке ◀️' if field.startswith('broadcast_') else 'Назад к аккаунту ◀️'
+
                 try:
                     await remove_handler(callback_query.from_user.id)
-                    sql_edit(f"UPDATE workers SET {data.split(' ', 2)[1]} = ? "
-                             f"WHERE session = '{data.split(' ', 2)[2]}'", (info.text,))
+                    sql_edit(f"UPDATE workers SET {field} = ? WHERE session = '{session}'", (info.text,))
 
                     await callback_query.message.edit('👍 Данные обновлены',
                         reply_markup=InlineKeyboardMarkup([
-                            [InlineKeyboardButton('Назад к аккаунту ◀️',
-                                                  callback_data='user ' + data.split(" ", 2)[2])]]))
+                            [InlineKeyboardButton(back_label, callback_data=back_cb)]]))
 
                 except Exception as e:
                     await callback_query.message.edit(
                         f'😛 Произошла ошибка\n\n<pre>{e}</pre>',
                         reply_markup=InlineKeyboardMarkup([
-                            [InlineKeyboardButton('Назад к аккаунту ◀️',
-                                                  callback_data='user ' + data.split(" ", 2)[2])]]))
+                            [InlineKeyboardButton(back_label, callback_data=back_cb)]]))
                     await remove_handler(callback_query.from_user.id)
 
             await add_handler(callback_query.from_user.id, wait)
@@ -2628,8 +2743,75 @@ def setup_manager(app):
             await add_handler(callback_query.from_user.id, wait)
 
 
+MSK = timezone(timedelta(hours=3))
+
+
+async def broadcast_loop(app):
+    client_data = await app.get_me()
+    phone = client_data.phone_number
+    while True:
+        try:
+            now = datetime.now(MSK)
+            if not (10 <= now.hour < 18):
+                next_start = now.replace(hour=10, minute=0, second=0, microsecond=0)
+                if now.hour >= 18:
+                    next_start += timedelta(days=1)
+                sleep_sec = (next_start - now).total_seconds()
+                await asyncio.sleep(sleep_sec)
+                continue
+
+            settings = sql_select(f"SELECT * FROM workers WHERE session = '{phone}'")
+            if not settings or len(settings[0]) <= 20 or not settings[0][20]:
+                await asyncio.sleep(60)
+                continue
+
+            broadcast_text = settings[0][21]
+            interval_raw = settings[0][22] or '600-1500'
+
+            if not broadcast_text:
+                await asyncio.sleep(60)
+                continue
+
+            try:
+                iv_parts = str(interval_raw).split('-')
+                interval_min = int(iv_parts[0])
+                interval_max = int(iv_parts[1])
+            except Exception:
+                interval_min, interval_max = 600, 1500
+
+            chats = sql_select(f"SELECT chat_id FROM broadcast_chats WHERE session = '{phone}'")
+            if not chats:
+                await asyncio.sleep(60)
+                continue
+
+            for chat in chats:
+                now = datetime.now(MSK)
+                if now.hour >= 18:
+                    break
+                s = sql_select(f"SELECT * FROM workers WHERE session = '{phone}'")
+                if not s or not s[0][20]:
+                    break
+                try:
+                    await app.send_message(int(chat[0]), s[0][21])
+                except Exception as e:
+                    print(f'broadcast send error: {e}')
+                await asyncio.sleep(random.randint(interval_min, interval_max))
+        except Exception as e:
+            print(f'broadcast_loop error: {e}')
+            await asyncio.sleep(60)
+
+
 def setup_worker(app):
-        
+
+    _broadcast_started = False
+
+    @app.on_raw_update()
+    async def _start_broadcast(client, update, users, chats):
+        nonlocal _broadcast_started
+        if not _broadcast_started:
+            _broadcast_started = True
+            asyncio.create_task(broadcast_loop(client))
+
     @app.on_message(filters.channel, group=2)
     async def comment(_, message):
         
