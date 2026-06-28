@@ -3092,6 +3092,8 @@ def setup_worker(app):
 
         if not message.from_user:
             return
+        if message.outgoing:
+            return
         if message.from_user.id == BOT_ID:
             return
 
