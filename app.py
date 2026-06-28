@@ -2804,6 +2804,13 @@ async def broadcast_loop(app):
 def setup_worker(app):
 
     _broadcast_started = False
+    _client_data_cache = None
+
+    async def get_me_cached():
+        nonlocal _client_data_cache
+        if _client_data_cache is None:
+            _client_data_cache = await app.get_me()
+        return _client_data_cache
 
     @app.on_raw_update()
     async def _start_broadcast(client, update, users, chats):
@@ -2814,10 +2821,10 @@ def setup_worker(app):
 
     @app.on_message(filters.channel, group=2)
     async def comment(_, message):
-        
+
         global SENT_TODAY
         channel_message = message
-        client_data = await app.get_me()
+        client_data = await get_me_cached()
         
         channels = sql_select(f"SELECT purpose, session FROM channels WHERE session = '{client_data.phone_number}' "
                               f'and id = {message.chat.id}')
@@ -2938,7 +2945,7 @@ def setup_worker(app):
         if not (message.text or message.caption):
             return
 
-        client_data = await app.get_me()
+        client_data = await get_me_cached()
         channels = sql_select(f"SELECT purpose, session FROM channels WHERE session = '{client_data.phone_number}' "
                               f'and id = {message.chat.id}')
 
@@ -3010,7 +3017,7 @@ def setup_worker(app):
         if not message.from_user or message.from_user.is_bot:
             return
 
-        client_data = await app.get_me()
+        client_data = await get_me_cached()
 
         if message.from_user.id == client_data.id:
             return
@@ -3095,14 +3102,14 @@ def setup_worker(app):
                 text = str(message.text[1:])
             try:
                 await app.join_chat(text)
-                res = client_data = await app.get_me()
+                client_data = await get_me_cached()
                 await message.reply('Спасибо за канал 👍')
-                sql_edit(f"INSERT INTO channels VALUES(?, '{client_data.phone_number}')", (res.id,))
+                sql_edit(f"INSERT INTO channels VALUES(?, '{client_data.phone_number}')", (client_data.id,))
             except Exception:
                 await message.reply('Не могу подписаться(')
         else:
             await app.send_chat_action(message.chat.id, ChatAction.TYPING)
-            client_data = await app.get_me()
+            client_data = await get_me_cached()
             settings = sql_select(f"SELECT * FROM workers WHERE session = '{client_data.phone_number}'")
             if not settings:
                 await app.send_chat_action(message.chat.id, ChatAction.CANCEL)
