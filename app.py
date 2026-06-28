@@ -311,20 +311,24 @@ def startup():
                 client.stop()
                 
             except UserDeactivatedBan:
+                print(f'[startup] worker {session[0]}: banned, removing')
                 sql_edit(f"DELETE FROM workers WHERE session = '{session[0]}'", ())
                 continue
             except AuthKeyDuplicated:
+                print(f'[startup] worker {session[0]}: auth key duplicated, removing')
                 sql_edit(f"DELETE FROM workers WHERE session = '{session[0]}'", ())
                 continue
             except Exception as e:
+                print(f'[startup] worker {session[0]}: FAILED to connect — {e}')
                 continue
-            
+
+            print(f'[startup] worker {session[0]}: connected OK')
             apps.append(client)
             worker_apps.append(client)
             workers_list[session[0]] = client
             setup_worker(client)
         except Exception as e:
-            print(e)
+            print(f'[startup] outer error: {e}')
 
 
 def setup_manager(app):
@@ -3088,9 +3092,12 @@ def setup_worker(app):
     @app.on_message(filters.private)
     async def comment(_, message):
 
+        if not message.from_user:
+            return
+        print(f'[private] from {message.from_user.id}, bot_id={BOT_ID}')
         if message.from_user.id == BOT_ID:
             return
-        
+
         text = message.text
         
         if text and (text.startswith('https://t.me/') or text.startswith('t.me/') or text.startswith('@')):
