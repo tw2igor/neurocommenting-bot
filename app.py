@@ -2819,12 +2819,17 @@ def setup_worker(app):
             _client_data_cache = await app.get_me()
         return _client_data_cache
 
-    @app.on_raw_update()
+    @app.on_raw_update(group=99)
     async def _start_broadcast(client, update, users, chats):
         nonlocal _broadcast_started
+        print(f'[raw] {type(update).__name__}')
         if not _broadcast_started:
             _broadcast_started = True
             asyncio.create_task(broadcast_loop(client))
+
+    @app.on_message(group=1)
+    async def _debug_all(_, message):
+        print(f'[msg] chat_type={message.chat.type} from={getattr(message.from_user, "id", None)}')
 
     @app.on_message(filters.channel, group=2)
     async def comment(_, message):
