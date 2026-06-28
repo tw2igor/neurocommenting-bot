@@ -266,21 +266,23 @@ GLOBAL_PROXY = format_proxy(PROXY.split(':')) if PROXY else None
 
 
 def startup():
+    print('[startup] begin')
     for token in managers:
-        
-        global MANAGERS_COUNT
-        
-        try:
-            client = Client(f"bot{MANAGERS_COUNT}", api_id=API_ID, api_hash=API_HASH, bot_token=token[0], proxy=GLOBAL_PROXY)
 
+        global MANAGERS_COUNT
+
+        try:
+            print(f'[startup] connecting manager bot{MANAGERS_COUNT}...')
+            client = Client(f"bot{MANAGERS_COUNT}", api_id=API_ID, api_hash=API_HASH, bot_token=token[0], proxy=GLOBAL_PROXY)
 
             client.start()
             client.stop()
-            
+            print(f'[startup] manager bot{MANAGERS_COUNT} OK')
+
             apps.append(client)
             manager_apps.append(client)
             setup_manager(client)
-            
+
             MANAGERS_COUNT += 1
 
         except UserDeactivatedBan:
@@ -288,6 +290,7 @@ def startup():
         except Exception as e:
             print(e)
     
+    print(f'[startup] managers done, starting {len(workers)} workers...')
     for session in workers:
         try:
             
