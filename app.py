@@ -266,18 +266,15 @@ GLOBAL_PROXY = format_proxy(PROXY.split(':')) if PROXY else None
 
 
 def startup():
-    print('[startup] begin')
     for token in managers:
 
         global MANAGERS_COUNT
 
         try:
-            print(f'[startup] connecting manager bot{MANAGERS_COUNT}...')
             client = Client(f"bot{MANAGERS_COUNT}", api_id=API_ID, api_hash=API_HASH, bot_token=token[0], proxy=GLOBAL_PROXY)
 
             client.start()
             client.stop()
-            print(f'[startup] manager bot{MANAGERS_COUNT} OK')
 
             apps.append(client)
             manager_apps.append(client)
@@ -289,11 +286,10 @@ def startup():
             continue
         except Exception as e:
             print(e)
-    
-    print(f'[startup] managers done, starting {len(workers)} workers...')
+
     for session in workers:
         try:
-            
+
             if session[1]:
                 try:
                     proxy = session[1].split(':')
@@ -307,31 +303,30 @@ def startup():
 
             else:
                 client = Client(session[0], api_id=API_ID, api_hash=API_HASH, proxy=GLOBAL_PROXY)
-            
+
             try:
                 client.start()
                 client.get_me()
                 client.stop()
-                
+
             except UserDeactivatedBan:
-                print(f'[startup] worker {session[0]}: banned, removing')
+                print(f'Worker {session[0]}: banned, removing')
                 sql_edit(f"DELETE FROM workers WHERE session = '{session[0]}'", ())
                 continue
             except AuthKeyDuplicated:
-                print(f'[startup] worker {session[0]}: auth key duplicated, removing')
+                print(f'Worker {session[0]}: auth key duplicated, removing')
                 sql_edit(f"DELETE FROM workers WHERE session = '{session[0]}'", ())
                 continue
             except Exception as e:
-                print(f'[startup] worker {session[0]}: FAILED to connect — {e}')
+                print(f'Worker {session[0]}: failed to connect — {e}')
                 continue
 
-            print(f'[startup] worker {session[0]}: connected OK')
             apps.append(client)
             worker_apps.append(client)
             workers_list[session[0]] = client
             setup_worker(client)
         except Exception as e:
-            print(f'[startup] outer error: {e}')
+            print(f'Startup error: {e}')
 
 
 def setup_manager(app):
@@ -2822,14 +2817,9 @@ def setup_worker(app):
     @app.on_raw_update(group=99)
     async def _start_broadcast(client, update, users, chats):
         nonlocal _broadcast_started
-        print(f'[raw] {type(update).__name__}')
         if not _broadcast_started:
             _broadcast_started = True
             asyncio.create_task(broadcast_loop(client))
-
-    @app.on_message(group=1)
-    async def _debug_all(_, message):
-        print(f'[msg] chat_type={message.chat.type} from={getattr(message.from_user, "id", None)}')
 
     @app.on_message(filters.channel, group=2)
     async def comment(_, message):
@@ -3102,7 +3092,6 @@ def setup_worker(app):
 
         if not message.from_user:
             return
-        print(f'[private] from {message.from_user.id}, bot_id={BOT_ID}')
         if message.from_user.id == BOT_ID:
             return
 
