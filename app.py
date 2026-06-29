@@ -3096,6 +3096,8 @@ def setup_worker(app):
             return
         if message.from_user.id == BOT_ID:
             return
+        if message.from_user.is_bot:
+            return
 
         text = message.text
         
@@ -3128,6 +3130,12 @@ def setup_worker(app):
             reply_delay  = settings[0][18] if len(settings[0]) > 18 and settings[0][18] is not None else 1
 
             sender = f'@{message.from_user.username}' if message.from_user.username else message.from_user.first_name
+
+            await notify(
+                f'📩 <b>Входящее сообщение</b>\n\n'
+                f'Аккаунт: {client_data.first_name}\n'
+                f'От: {sender}\n'
+                f'Текст: {(message.text or "")[:300]}')
 
             if reply_use_ai and reply_role:
                 user_id = str(message.from_user.id)
