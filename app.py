@@ -2781,7 +2781,7 @@ async def broadcast_loop(app):
             except Exception:
                 interval_min, interval_max = 600, 1500
 
-            chats = sql_select(f"SELECT chat_id FROM broadcast_chats WHERE session = '{phone}'")
+            chats = sql_select(f"SELECT chat_id, chat_title FROM broadcast_chats WHERE session = '{phone}'")
             if not chats:
                 await asyncio.sleep(60)
                 continue
@@ -2795,6 +2795,12 @@ async def broadcast_loop(app):
                     break
                 try:
                     await app.send_message(int(chat[0]), s[0][21])
+                    chat_title = chat[1] or chat[0]
+                    await notify(
+                        f'📢 <b>Рассылка отправлена</b>\n\n'
+                        f'Аккаунт: {client_data.first_name}\n'
+                        f'Чат: {chat_title}\n'
+                        f'Текст: {s[0][21][:300]}')
                 except Exception as e:
                     print(f'broadcast send error: {e}')
                 await asyncio.sleep(random.randint(interval_min, interval_max))
@@ -3130,12 +3136,6 @@ def setup_worker(app):
             reply_delay  = settings[0][18] if len(settings[0]) > 18 and settings[0][18] is not None else 1
 
             sender = f'@{message.from_user.username}' if message.from_user.username else message.from_user.first_name
-
-            await notify(
-                f'📩 <b>Входящее сообщение</b>\n\n'
-                f'Аккаунт: {client_data.first_name}\n'
-                f'От: {sender}\n'
-                f'Текст: {(message.text or "")[:300]}')
 
             if reply_use_ai and reply_role:
                 user_id = str(message.from_user.id)
