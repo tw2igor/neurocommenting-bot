@@ -43,6 +43,7 @@ with sqlite3.connect("database.db") as connection:
         'ALTER TABLE workers ADD COLUMN broadcast_enabled INT DEFAULT 0',
         'ALTER TABLE workers ADD COLUMN broadcast_text TEXT',
         'ALTER TABLE workers ADD COLUMN broadcast_interval TEXT DEFAULT "600-1500"',
+        'ALTER TABLE workers ADD COLUMN auto_reply_enabled INT DEFAULT 1',
     ]
 
     def sql_edit(command, args):

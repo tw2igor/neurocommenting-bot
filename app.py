@@ -329,6 +329,43 @@ def startup():
             print(f'Startup error: {e}')
 
 
+async def _show_autoreply_menu(edit_func, session):
+    s = sql_select(f"SELECT auto_reply, reply_use_ai, reply_role, reply_prompt, reply_max_rounds, reply_delay, auto_reply_enabled FROM workers WHERE session = '{session}'")
+    if not s:
+        return
+    auto_reply_text, reply_use_ai, reply_role, reply_prompt, reply_max_rounds, reply_delay, enabled = s[0]
+    enabled = 1 if enabled is None else enabled
+    reply_max_rounds = reply_max_rounds or 3
+    reply_delay = reply_delay if reply_delay is not None else 1
+    status = '✅ Включены' if enabled else '❌ Выключены'
+    mode_label = '🤖 ИИ-диалог' if reply_use_ai else '📝 Статичный текст'
+    text = (
+        f'<b>Автоответы 💬</b>\n\n'
+        f'Статус: <b>{status}</b>\n'
+        f'Режим: <b>{mode_label}</b>\n\n'
+        f'<b>Статичный текст:</b>\n<code>{auto_reply_text or "не задан"}</code>\n\n'
+        f'<b>ИИ-диалог:</b>\n'
+        f'Роль: <code>{reply_role or "не задана"}</code>\n'
+        f'Промпт: <code>{reply_prompt or "не задан"}</code>\n'
+        f'Раундов: <code>{reply_max_rounds}</code>\n\n'
+        f'Задержка: <code>{reply_delay} сек</code>'
+    )
+    kb = [
+        [InlineKeyboardButton('Выключить ❌' if enabled else 'Включить ✅',
+                              callback_data=f'toggleautoreply {session}')],
+        [InlineKeyboardButton(f'Режим: {"→ Статичный" if reply_use_ai else "→ ИИ-диалог"}',
+                              callback_data=f'togglereplyai {session}')],
+        [InlineKeyboardButton('Статичный текст ✏️', callback_data=f'set auto_reply {session}')],
+        [InlineKeyboardButton('Роль для диалога 🤖', callback_data=f'set reply_role {session}')],
+        [InlineKeyboardButton('Промпт для диалога 📝', callback_data=f'set reply_prompt {session}')],
+        [InlineKeyboardButton(f'Раундов: {reply_max_rounds}', callback_data=f'set reply_max_rounds {session}'),
+         InlineKeyboardButton(f'Задержка: {reply_delay} сек ⏱', callback_data=f'set reply_delay {session}')],
+        [InlineKeyboardButton('Очистить историю 🗑', callback_data=f'clear_reply_history {session}')],
+        [InlineKeyboardButton('Назад к аккаунту ◀️', callback_data=f'user {session}')],
+    ]
+    await edit_func(text, reply_markup=InlineKeyboardMarkup(kb))
+
+
 def setup_manager(app):
     
     manager_apps.append(app)
@@ -774,64 +811,17 @@ def setup_manager(app):
                     f'<b>{client_data.first_name}</b> @{client_data.username}:\n\n'
                     f'⭐ Премиум: {client_data.is_premium}\n'
                     f'🚫 Ограничения: {client_data.is_restricted}\n\n'
-                    f'🤖 Роль: <code>{settings[0][2]}</code>\n'
-                    f'🤖 Промпт: <code>{settings[0][7]}</code>\n\n'
                     f'💬 Автоответ: {autoreply_mode}')
                 
-                keyboard.append(
-                    [InlineKeyboardButton('Промпт 🤖', callback_data=f'set what_to_write {client_data.phone_number}')])
-                keyboard.append(
-                    [InlineKeyboardButton('Роль 🤖', callback_data=f'set prompt {client_data.phone_number}'),
-                     InlineKeyboardButton('Автоответы 💬', callback_data=f'autoreply_menu {client_data.phone_number}')])
-                keyboard.append(
-                    [InlineKeyboardButton(
-                        f'Задержка - {settings[0][4]} ⌛', callback_data=f'set delay {client_data.phone_number}'),
-                     InlineKeyboardButton(
-                         f'Шанс коммента - {settings[0][5]} 🎲', callback_data=f'set chance {client_data.phone_number}')])
+                keyboard.append([InlineKeyboardButton('Нейрокомментинг ⚙️', callback_data=f'neurocommenting {client_data.phone_number}')])
+                keyboard.append([InlineKeyboardButton('Автоответы 💬', callback_data=f'autoreply_menu {client_data.phone_number}')])
                 keyboard.append([InlineKeyboardButton('Профиль ⛓️', url=f'tg://user?id={client_data.id}'),
                                  InlineKeyboardButton('✏️', callback_data=f'change {client_data.phone_number}')])
-                keyboard.append(
-                    [InlineKeyboardButton('Добавить каналы 💬', callback_data=f'newchannels {client_data.phone_number} comments'),
-                     InlineKeyboardButton('Удалить аккаунт ❌', callback_data=f'del {client_data.phone_number}')])
-                
-                min_post_length = settings[0][19] if len(settings[0]) > 19 and settings[0][19] else 0
-                keyboard.append(
-                    [InlineKeyboardButton(f'Комментировать первым {be_first}', callback_data=f'switchbefirst {client_data.phone_number}'),
-                     InlineKeyboardButton(f'Мин. символов: {min_post_length or "нет"} 📏', callback_data=f'set min_post_length {client_data.phone_number}')])
-
-
-                if settings[0][9] == 1:
-                    use_gpt = '✅'
-                else:
-                    use_gpt = '❌'
-
-
-                keyboard.append(
-                    [InlineKeyboardButton(f'Комментировать шаблонами {use_gpt}', callback_data=f'switchgpt {client_data.phone_number}')])
-
-                keyboard.append(
-                    [InlineKeyboardButton(f'Шаблоны коммента',
-                                          callback_data=f'editpretexts {client_data.phone_number}')])
-
-                keyboard.append(
-                    [InlineKeyboardButton('Аутрич в ЛС 📨', callback_data=f'outreach {client_data.phone_number}')])
-
-                keyboard.append(
-                    [InlineKeyboardButton('Последние посты 🌴', callback_data=f'posts {client_data.phone_number}')])
-                
-                keyboard.append(
-                    [InlineKeyboardButton('Список каналов 🧿', callback_data=f'allchannels {client_data.phone_number}')])
-
-                keyboard.append(
-                    [InlineKeyboardButton('Инвайтинг 🦁',
-                                          callback_data=f'inviting {client_data.phone_number}')])
-                keyboard.append(
-                    [InlineKeyboardButton('Рассылка по лс 🌪',
-                                          callback_data=f'spam_dms {client_data.phone_number}')])
-                keyboard.append(
-                    [InlineKeyboardButton('Рассылка в чаты 📢',
-                                          callback_data=f'broadcast {client_data.phone_number}')])
-
+                keyboard.append([InlineKeyboardButton('Удалить аккаунт ❌', callback_data=f'del {client_data.phone_number}')])
+                keyboard.append([InlineKeyboardButton('Аутрич в ЛС 📨', callback_data=f'outreach {client_data.phone_number}')])
+                keyboard.append([InlineKeyboardButton('Инвайтинг 🦁', callback_data=f'inviting {client_data.phone_number}')])
+                keyboard.append([InlineKeyboardButton('Рассылка по лс 🌪', callback_data=f'spam_dms {client_data.phone_number}')])
+                keyboard.append([InlineKeyboardButton('Рассылка в чаты 📢', callback_data=f'broadcast {client_data.phone_number}')])
                 keyboard.append([InlineKeyboardButton('Все Аккаунты ◀️', callback_data='accounts')])
                 
                 await callback_query.message.edit(reply_text, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -899,7 +889,7 @@ def setup_manager(app):
             
                 sql_edit(f"UPDATE workers SET be_first = {val} WHERE session = '{data.split()[1]}'", ())
                 await callback_query.message.edit(text, reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton('К аккаунту 👤', callback_data=f'user {data.split()[1]}')],
+                    [InlineKeyboardButton('К нейрокомментингу ⚙️', callback_data=f'neurocommenting {data.split()[1]}')],
                     [InlineKeyboardButton('Список аккаунтов ◀️', callback_data='accounts')]]))
             
         elif data.startswith('switchgpt'):
@@ -916,7 +906,7 @@ def setup_manager(app):
 
                 sql_edit(f"UPDATE workers SET dont_use_gpt = {val} WHERE session = '{data.split()[1]}'", ())
                 await callback_query.message.edit(text, reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton('К аккаунту 👤', callback_data=f'user {data.split()[1]}')],
+                    [InlineKeyboardButton('К нейрокомментингу ⚙️', callback_data=f'neurocommenting {data.split()[1]}')],
                     [InlineKeyboardButton('Список аккаунтов ◀️', callback_data='accounts')]]))
 
         elif data.startswith('switchoutreach'):
@@ -1975,39 +1965,52 @@ def setup_manager(app):
             
             await add_handler(callback_query.from_user.id, functions[args[1]][1])
         
-        elif data.startswith('autoreply_menu'):
+        elif data.startswith('neurocommenting ') and len(data.split()) == 2:
 
             session = data.split()[1]
-            s = sql_select(f"SELECT auto_reply, reply_use_ai, reply_role, reply_prompt, reply_max_rounds, reply_delay FROM workers WHERE session = '{session}'")
-            if not s:
+            settings = sql_select(f"SELECT * FROM workers WHERE session = '{session}'")
+            if not settings:
                 return
-            auto_reply_text, reply_use_ai, reply_role, reply_prompt, reply_max_rounds, reply_delay = s[0]
-            reply_max_rounds = reply_max_rounds or 3
-            reply_delay = reply_delay if reply_delay is not None else 1
-            mode_label = '🤖 ИИ-диалог' if reply_use_ai else '📝 Статичный текст'
+            be_first_icon = '✅' if settings[0][6] == 1 else '❌'
+            use_gpt_icon = '✅' if settings[0][9] == 1 else '❌'
+            min_post_length = settings[0][19] if len(settings[0]) > 19 and settings[0][19] else 0
             text = (
-                f'<b>Автоответы 💬</b>\n\n'
-                f'Режим: <b>{mode_label}</b>\n\n'
-                f'<b>Статичный текст:</b>\n<code>{auto_reply_text or "не задан"}</code>\n\n'
-                f'<b>ИИ-диалог:</b>\n'
-                f'Роль: <code>{reply_role or "не задана"}</code>\n'
-                f'Промпт: <code>{reply_prompt or "не задан"}</code>\n'
-                f'Раундов: <code>{reply_max_rounds}</code>\n\n'
-                f'Задержка: <code>{reply_delay} сек</code>'
+                f'<b>Нейрокомментинг ⚙️</b>\n\n'
+                f'Роль: <code>{settings[0][2] or "не задана"}</code>\n'
+                f'Промпт: <code>{settings[0][7] or "не задан"}</code>\n\n'
+                f'Задержка: <b>{settings[0][4]} сек</b>\n'
+                f'Шанс: <b>1/{settings[0][5]}</b>\n'
+                f'Первым: <b>{be_first_icon}</b>  Мин. символов: <b>{min_post_length or "нет"}</b>\n'
+                f'Шаблоны: <b>{use_gpt_icon}</b>'
             )
             kb = [
-                [InlineKeyboardButton(
-                    f'Режим: {"→ Статичный" if reply_use_ai else "→ ИИ-диалог"}',
-                    callback_data=f'togglereplyai {session}')],
-                [InlineKeyboardButton('Статичный текст ✏️', callback_data=f'set auto_reply {session}')],
-                [InlineKeyboardButton('Роль для диалога 🤖', callback_data=f'set reply_role {session}')],
-                [InlineKeyboardButton('Промпт для диалога 📝', callback_data=f'set reply_prompt {session}')],
-                [InlineKeyboardButton(f'Раундов: {reply_max_rounds}', callback_data=f'set reply_max_rounds {session}'),
-                 InlineKeyboardButton(f'Задержка: {reply_delay} сек ⏱', callback_data=f'set reply_delay {session}')],
-                [InlineKeyboardButton('Очистить историю 🗑', callback_data=f'clear_reply_history {session}')],
+                [InlineKeyboardButton('Промпт 🤖', callback_data=f'set what_to_write {session}')],
+                [InlineKeyboardButton('Роль 🤖', callback_data=f'set prompt {session}')],
+                [InlineKeyboardButton(f'Задержка: {settings[0][4]} сек ⌛', callback_data=f'set delay {session}'),
+                 InlineKeyboardButton(f'Шанс: 1/{settings[0][5]} 🎲', callback_data=f'set chance {session}')],
+                [InlineKeyboardButton(f'Первым {be_first_icon}', callback_data=f'switchbefirst {session}'),
+                 InlineKeyboardButton(f'Мин. символов: {min_post_length or "нет"} 📏', callback_data=f'set min_post_length {session}')],
+                [InlineKeyboardButton(f'Шаблоны {use_gpt_icon}', callback_data=f'switchgpt {session}')],
+                [InlineKeyboardButton('Шаблоны коммента 📝', callback_data=f'editpretexts {session}')],
+                [InlineKeyboardButton('Добавить каналы 💬', callback_data=f'newchannels {session} comments'),
+                 InlineKeyboardButton('Список каналов 🧿', callback_data=f'allchannels {session}')],
+                [InlineKeyboardButton('Последние посты 🌴', callback_data=f'posts {session}')],
                 [InlineKeyboardButton('Назад к аккаунту ◀️', callback_data=f'user {session}')],
             ]
             await callback_query.message.edit(text, reply_markup=InlineKeyboardMarkup(kb))
+
+        elif data.startswith('toggleautoreply '):
+
+            session = data.split()[1]
+            cur = sql_select(f"SELECT auto_reply_enabled FROM workers WHERE session = '{session}'")
+            new_val = 0 if (cur and cur[0][0]) else 1
+            sql_edit("UPDATE workers SET auto_reply_enabled = ? WHERE session = ?", (new_val, session))
+            await _show_autoreply_menu(callback_query.message.edit, session)
+
+        elif data.startswith('autoreply_menu'):
+
+            session = data.split()[1]
+            await _show_autoreply_menu(callback_query.message.edit, session)
 
         elif data.startswith('togglereplyai'):
 
@@ -2015,39 +2018,7 @@ def setup_manager(app):
             current = sql_select(f"SELECT reply_use_ai FROM workers WHERE session = '{session}'")
             new_val = 0 if (current and current[0][0]) else 1
             sql_edit(f"UPDATE workers SET reply_use_ai = {new_val} WHERE session = '{session}'", ())
-            callback_query.data = f'autoreply_menu {session}'
-            data = callback_query.data
-
-            s = sql_select(f"SELECT auto_reply, reply_use_ai, reply_role, reply_prompt, reply_max_rounds, reply_delay FROM workers WHERE session = '{session}'")
-            if not s:
-                return
-            auto_reply_text, reply_use_ai, reply_role, reply_prompt, reply_max_rounds, reply_delay = s[0]
-            reply_max_rounds = reply_max_rounds or 3
-            reply_delay = reply_delay if reply_delay is not None else 1
-            mode_label = '🤖 ИИ-диалог' if reply_use_ai else '📝 Статичный текст'
-            text = (
-                f'<b>Автоответы 💬</b>\n\n'
-                f'Режим: <b>{mode_label}</b>\n\n'
-                f'<b>Статичный текст:</b>\n<code>{auto_reply_text or "не задан"}</code>\n\n'
-                f'<b>ИИ-диалог:</b>\n'
-                f'Роль: <code>{reply_role or "не задана"}</code>\n'
-                f'Промпт: <code>{reply_prompt or "не задан"}</code>\n'
-                f'Раундов: <code>{reply_max_rounds}</code>\n\n'
-                f'Задержка: <code>{reply_delay} сек</code>'
-            )
-            kb = [
-                [InlineKeyboardButton(
-                    f'Режим: {"→ Статичный" if reply_use_ai else "→ ИИ-диалог"}',
-                    callback_data=f'togglereplyai {session}')],
-                [InlineKeyboardButton('Статичный текст ✏️', callback_data=f'set auto_reply {session}')],
-                [InlineKeyboardButton('Роль для диалога 🤖', callback_data=f'set reply_role {session}')],
-                [InlineKeyboardButton('Промпт для диалога 📝', callback_data=f'set reply_prompt {session}')],
-                [InlineKeyboardButton(f'Раундов: {reply_max_rounds}', callback_data=f'set reply_max_rounds {session}'),
-                 InlineKeyboardButton(f'Задержка: {reply_delay} сек ⏱', callback_data=f'set reply_delay {session}')],
-                [InlineKeyboardButton('Очистить историю 🗑', callback_data=f'clear_reply_history {session}')],
-                [InlineKeyboardButton('Назад к аккаунту ◀️', callback_data=f'user {session}')],
-            ]
-            await callback_query.message.edit(text, reply_markup=InlineKeyboardMarkup(kb))
+            await _show_autoreply_menu(callback_query.message.edit, session)
 
         elif data.startswith('clear_reply_history'):
 
@@ -2116,7 +2087,7 @@ def setup_manager(app):
                     reply_markup=InlineKeyboardMarkup(
                         [[InlineKeyboardButton('Задать новый текст ✏️', callback_data='confirm' + data)],
                          [InlineKeyboardButton('Убрать автоответ', callback_data='no auto_reply ' + data.split()[2]),
-                          InlineKeyboardButton('Назад ◀️', callback_data='user ' + data.split()[2])]]))
+                          InlineKeyboardButton('Назад ◀️', callback_data='autoreply_menu ' + data.split()[2])]]))
                 return
             
             elif data.startswith('set reply_role'):
@@ -2191,8 +2162,18 @@ def setup_manager(app):
 
                 field = data.split(' ', 2)[1]
                 session = data.split(' ', 2)[2]
-                back_cb = f'broadcast {session}' if field.startswith('broadcast_') else f'user {session}'
-                back_label = 'Назад к рассылке ◀️' if field.startswith('broadcast_') else 'Назад к аккаунту ◀️'
+                if field.startswith('broadcast_'):
+                    back_cb = f'broadcast {session}'
+                    back_label = 'Назад к рассылке ◀️'
+                elif field in ('what_to_write', 'prompt', 'delay', 'chance', 'min_post_length'):
+                    back_cb = f'neurocommenting {session}'
+                    back_label = 'Назад к нейрокомментингу ◀️'
+                elif field in ('reply_role', 'reply_prompt', 'reply_max_rounds', 'reply_delay'):
+                    back_cb = f'autoreply_menu {session}'
+                    back_label = 'Назад к автоответам ◀️'
+                else:
+                    back_cb = f'user {session}'
+                    back_label = 'Назад к аккаунту ◀️'
 
                 try:
                     await remove_handler(callback_query.from_user.id)
@@ -3126,6 +3107,11 @@ def setup_worker(app):
             client_data = await get_me_cached()
             settings = sql_select(f"SELECT * FROM workers WHERE session = '{client_data.phone_number}'")
             if not settings:
+                await app.send_chat_action(message.chat.id, ChatAction.CANCEL)
+                return
+
+            auto_reply_enabled = settings[0][23] if len(settings[0]) > 23 and settings[0][23] is not None else 1
+            if not auto_reply_enabled:
                 await app.send_chat_action(message.chat.id, ChatAction.CANCEL)
                 return
 
