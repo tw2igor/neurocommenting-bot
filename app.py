@@ -792,32 +792,34 @@ def setup_manager(app):
             try:
                 await callback_query.message.edit('Получаем данные об аккаунте...')
                 
-                settings = sql_select(f"SELECT * FROM workers WHERE session = '{data.split()[1]}'")
-                
-                if settings[0][6] == 1:
-                    be_first = '✅'
-                else:
-                    be_first = '❌'
-                
+                session = data.split()[1]
+                settings = sql_select(f"SELECT * FROM workers WHERE session = '{session}'")
+
                 client = workers_list[data.split(' ', 1)[1]]
-                
                 client_data = await client.get_me()
                 keyboard = []
-                
-                
-                reply_use_ai_info = settings[0][14] if len(settings[0]) > 14 else 0
-                autoreply_mode = 'ИИ-диалог 🤖' if reply_use_ai_info else f'Статичный: <code>{settings[0][3]}</code>'
+
+                channels_count_row = sql_select(f"SELECT COUNT(*) FROM channels WHERE session = '{session}'")
+                channels_count = channels_count_row[0][0] if channels_count_row else 0
+
+                auto_reply_enabled = settings[0][23] if len(settings[0]) > 23 and settings[0][23] is not None else 1
+                broadcast_enabled = settings[0][20] if len(settings[0]) > 20 and settings[0][20] is not None else 0
+                dm_enabled = settings[0][10] if len(settings[0]) > 10 and settings[0][10] is not None else 0
+
                 reply_text = (
                     f'<b>{client_data.first_name}</b> @{client_data.username}:\n\n'
                     f'⭐ Премиум: {client_data.is_premium}\n'
                     f'🚫 Ограничения: {client_data.is_restricted}\n\n'
-                    f'💬 Автоответ: {autoreply_mode}')
-                
-                keyboard.append([InlineKeyboardButton('Нейрокомментинг ⚙️', callback_data=f'neurocommenting {client_data.phone_number}')])
-                keyboard.append([InlineKeyboardButton('Автоответы 💬', callback_data=f'autoreply_menu {client_data.phone_number}')])
+                    f'⚙️ Нейрокомментинг: {channels_count} каналов\n'
+                    f'💬 Автоответы: {"✅" if auto_reply_enabled else "❌"}\n'
+                    f'📢 Рассылка в чаты: {"✅" if broadcast_enabled else "❌"}\n'
+                    f'📨 Аутрич в ЛС: {"✅" if dm_enabled else "❌"}')
+
                 keyboard.append([InlineKeyboardButton('Профиль ⛓️', url=f'tg://user?id={client_data.id}'),
                                  InlineKeyboardButton('✏️', callback_data=f'change {client_data.phone_number}')])
                 keyboard.append([InlineKeyboardButton('Удалить аккаунт ❌', callback_data=f'del {client_data.phone_number}')])
+                keyboard.append([InlineKeyboardButton('Нейрокомментинг ⚙️', callback_data=f'neurocommenting {client_data.phone_number}')])
+                keyboard.append([InlineKeyboardButton('Автоответы 💬', callback_data=f'autoreply_menu {client_data.phone_number}')])
                 keyboard.append([InlineKeyboardButton('Аутрич в ЛС 📨', callback_data=f'outreach {client_data.phone_number}')])
                 keyboard.append([InlineKeyboardButton('Инвайтинг 🦁', callback_data=f'inviting {client_data.phone_number}')])
                 keyboard.append([InlineKeyboardButton('Рассылка по лс 🌪', callback_data=f'spam_dms {client_data.phone_number}')])
