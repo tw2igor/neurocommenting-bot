@@ -44,6 +44,8 @@ with sqlite3.connect("database.db") as connection:
         'ALTER TABLE workers ADD COLUMN broadcast_text TEXT',
         'ALTER TABLE workers ADD COLUMN broadcast_interval TEXT DEFAULT "600-1500"',
         'ALTER TABLE workers ADD COLUMN auto_reply_enabled INT DEFAULT 1',
+        'CREATE TABLE IF NOT EXISTS bot_admins(user_id TEXT NOT NULL UNIQUE)',
+        'ALTER TABLE managers ADD COLUMN global_proxy TEXT',
     ]
 
     def sql_edit(command, args):

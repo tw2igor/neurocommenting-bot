@@ -34,7 +34,7 @@ AI_API_BASE = 'https://agent.timeweb.cloud/api/v1/cloud-ai/agents'
 
 conversation_history = ["Привет, как дела?", "Все отлично! Как я могу помочь вам?"]
 
-admins = ADMINS
+admins = list(ADMINS)
 
 MAIN_KEYBOARD = ReplyKeyboardMarkup([['Мои аккаунты 🙂'], ['Меню 🌴']], resize_keyboard=True)
 
@@ -54,6 +54,15 @@ emojies = ('🤝', '👍', '🤔', '💪', '🤓')
 
 for command in core_commands:
     sql_edit(command, ())
+
+# загружаем или инициализируем список администраторов из DB
+
+_db_admins = sql_select('SELECT user_id FROM bot_admins')
+if _db_admins:
+    admins = [int(r[0]) for r in _db_admins]
+else:
+    for _aid in ADMINS:
+        sql_edit('INSERT OR IGNORE INTO bot_admins(user_id) VALUES(?)', (str(_aid),))
 
 # получаем уже сохраненные сессии
 
@@ -125,6 +134,8 @@ async def menu(message):
     keyboard.append([InlineKeyboardButton('Токен AI ♻️', callback_data='token')])
     keyboard.append([InlineKeyboardButton('Agent ID AI 🖥️', callback_data='proxy')])
     keyboard.append([InlineKeyboardButton('Новый бот для управления 🤖', callback_data='bot')])
+    keyboard.append([InlineKeyboardButton('Администраторы бота 👥', callback_data='manage_admins'),
+                     InlineKeyboardButton('Общий прокси 🌐', callback_data='set_global_proxy')])
     keyboard.append([InlineKeyboardButton('Добавить аккаунт 🤓', callback_data='+')])
     
     await message.edit(
@@ -263,6 +274,11 @@ def format_proxy(proxy):
         return False
 
 GLOBAL_PROXY = format_proxy(PROXY.split(':')) if PROXY else None
+
+# переопределяем глобальный прокси из DB, если задан там
+_db_proxy = sql_select('SELECT global_proxy FROM managers LIMIT 1')
+if _db_proxy and _db_proxy[0][0]:
+    GLOBAL_PROXY = format_proxy(_db_proxy[0][0].split(':'))
 
 
 def startup():
@@ -817,7 +833,8 @@ def setup_manager(app):
 
                 keyboard.append([InlineKeyboardButton('Профиль ⛓️', url=f'tg://user?id={client_data.id}'),
                                  InlineKeyboardButton('✏️', callback_data=f'change {client_data.phone_number}')])
-                keyboard.append([InlineKeyboardButton('Удалить аккаунт ❌', callback_data=f'del {client_data.phone_number}')])
+                keyboard.append([InlineKeyboardButton('Изменить proxy 🌐', callback_data=f'set_worker_proxy {client_data.phone_number}'),
+                                 InlineKeyboardButton('Удалить аккаунт ❌', callback_data=f'del {client_data.phone_number}')])
                 keyboard.append([InlineKeyboardButton('Нейрокомментинг ⚙️', callback_data=f'neurocommenting {client_data.phone_number}')])
                 keyboard.append([InlineKeyboardButton('Автоответы 💬', callback_data=f'autoreply_menu {client_data.phone_number}')])
                 keyboard.append([InlineKeyboardButton('Аутрич в ЛС 📨', callback_data=f'outreach {client_data.phone_number}')])
@@ -2575,6 +2592,164 @@ def setup_manager(app):
             
             await add_handler(callback_query.from_user.id, wait)
             
+        elif data == 'manage_admins':
+
+            db_rows = sql_select('SELECT user_id FROM bot_admins')
+            kb = []
+            for row in (db_rows or []):
+                kb.append([InlineKeyboardButton(f'❌ {row[0]}', callback_data=f'del_admin {row[0]}')])
+            kb.append([InlineKeyboardButton('Добавить ➕', callback_data='add_admin')])
+            kb.append([InlineKeyboardButton('Назад ◀️', callback_data='Main menu')])
+            await callback_query.message.edit(
+                '<b>Администраторы бота 👥</b>\n\nНажми на ID чтобы удалить',
+                reply_markup=InlineKeyboardMarkup(kb))
+
+        elif data.startswith('del_admin '):
+
+            user_id = data.split()[1]
+            sql_edit('DELETE FROM bot_admins WHERE user_id = ?', (user_id,))
+            if int(user_id) in admins:
+                admins.remove(int(user_id))
+            db_rows = sql_select('SELECT user_id FROM bot_admins')
+            kb = []
+            for row in (db_rows or []):
+                kb.append([InlineKeyboardButton(f'❌ {row[0]}', callback_data=f'del_admin {row[0]}')])
+            kb.append([InlineKeyboardButton('Добавить ➕', callback_data='add_admin')])
+            kb.append([InlineKeyboardButton('Назад ◀️', callback_data='Main menu')])
+            await callback_query.message.edit(
+                '<b>Администраторы бота 👥</b>\n\nНажми на ID чтобы удалить',
+                reply_markup=InlineKeyboardMarkup(kb))
+
+        elif data == 'add_admin':
+
+            await callback_query.message.edit('Введите Telegram ID нового администратора:',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Отмена ✖️', callback_data='manage_admins')]]))
+
+            async def wait(message):
+                await remove_handler(callback_query.from_user.id)
+                try:
+                    await app.delete_messages(message.chat.id, message.id)
+                except Exception:
+                    pass
+                try:
+                    new_id = int(message.text.strip())
+                    sql_edit('INSERT OR IGNORE INTO bot_admins(user_id) VALUES(?)', (str(new_id),))
+                    if new_id not in admins:
+                        admins.append(new_id)
+                    db_rows = sql_select('SELECT user_id FROM bot_admins')
+                    kb = []
+                    for row in (db_rows or []):
+                        kb.append([InlineKeyboardButton(f'❌ {row[0]}', callback_data=f'del_admin {row[0]}')])
+                    kb.append([InlineKeyboardButton('Добавить ➕', callback_data='add_admin')])
+                    kb.append([InlineKeyboardButton('Назад ◀️', callback_data='Main menu')])
+                    await callback_query.message.edit(
+                        f'✅ Добавлен: <code>{new_id}</code>\n\n<b>Администраторы бота 👥</b>\n\nНажми на ID чтобы удалить',
+                        reply_markup=InlineKeyboardMarkup(kb))
+                except ValueError:
+                    await callback_query.message.edit('❌ Неверный формат. Введите числовой Telegram ID.',
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Назад ◀️', callback_data='manage_admins')]]))
+                except Exception as e:
+                    await callback_query.message.edit(f'😛 Ошибка\n\n<pre>{e}</pre>',
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Назад ◀️', callback_data='manage_admins')]]))
+                    await remove_handler(callback_query.from_user.id)
+
+            await add_handler(callback_query.from_user.id, wait)
+
+        elif data == 'set_global_proxy':
+
+            global GLOBAL_PROXY
+            db_row = sql_select('SELECT global_proxy FROM managers LIMIT 1')
+            current_proxy = db_row[0][0] if db_row and db_row[0][0] else (PROXY or 'не задан')
+            await callback_query.message.edit(
+                f'<b>Общий прокси 🌐</b>\n\nТекущий: <code>{current_proxy}</code>\n\n'
+                f'Введите новый прокси в формате:\n'
+                f'<code>socks5:host:port</code>\n'
+                f'<code>socks5:host:port:user:pass</code>\n\n'
+                f'Или нажмите «Без прокси» чтобы убрать',
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton('Без прокси', callback_data='clear_global_proxy')],
+                    [InlineKeyboardButton('Отмена ✖️', callback_data='Main menu')]]))
+
+            async def wait(message):
+                global GLOBAL_PROXY
+                await remove_handler(callback_query.from_user.id)
+                try:
+                    await app.delete_messages(message.chat.id, message.id)
+                except Exception:
+                    pass
+                try:
+                    proxy_str = message.text.strip()
+                    parsed = format_proxy(proxy_str.split(':'))
+                    if not parsed:
+                        await callback_query.message.edit('❌ Неверный формат прокси.',
+                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Назад ◀️', callback_data='Main menu')]]))
+                        return
+                    GLOBAL_PROXY = parsed
+                    sql_edit('UPDATE managers SET global_proxy = ?', (proxy_str,))
+                    await callback_query.message.edit(
+                        f'✅ Общий прокси обновлён: <code>{proxy_str}</code>',
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Назад ◀️', callback_data='Main menu')]]))
+                except Exception as e:
+                    await callback_query.message.edit(f'😛 Ошибка\n\n<pre>{e}</pre>',
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Назад ◀️', callback_data='Main menu')]]))
+                    await remove_handler(callback_query.from_user.id)
+
+            await add_handler(callback_query.from_user.id, wait)
+
+        elif data == 'clear_global_proxy':
+
+            global GLOBAL_PROXY
+            GLOBAL_PROXY = None
+            sql_edit('UPDATE managers SET global_proxy = ?', (None,))
+            await callback_query.message.edit(
+                '✅ Общий прокси убран.',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Назад ◀️', callback_data='Main menu')]]))
+
+        elif data.startswith('set_worker_proxy '):
+
+            session = data.split()[1]
+            cur = sql_select(f"SELECT proxy FROM workers WHERE session = '{session}'")
+            current_proxy = cur[0][0] if cur and cur[0][0] else 'не задан'
+            await callback_query.message.edit(
+                f'<b>Прокси аккаунта</b>\n\nТекущий: <code>{current_proxy}</code>\n\n'
+                f'Введите новый прокси:\n'
+                f'<code>socks5:host:port</code>\n'
+                f'<code>socks5:host:port:user:pass</code>',
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton('Без прокси', callback_data=f'clear_worker_proxy {session}')],
+                    [InlineKeyboardButton('Отмена ✖️', callback_data=f'user {session}')]]))
+
+            async def wait(message):
+                await remove_handler(callback_query.from_user.id)
+                try:
+                    await app.delete_messages(message.chat.id, message.id)
+                except Exception:
+                    pass
+                try:
+                    proxy_str = message.text.strip()
+                    if not format_proxy(proxy_str.split(':')):
+                        await callback_query.message.edit('❌ Неверный формат прокси.',
+                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Назад ◀️', callback_data=f'user {session}')]]))
+                        return
+                    sql_edit(f"UPDATE workers SET proxy = ? WHERE session = ?", (proxy_str, session))
+                    await callback_query.message.edit(
+                        f'✅ Прокси обновлён: <code>{proxy_str}</code>',
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('К аккаунту ◀️', callback_data=f'user {session}')]]))
+                except Exception as e:
+                    await callback_query.message.edit(f'😛 Ошибка\n\n<pre>{e}</pre>',
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('К аккаунту ◀️', callback_data=f'user {session}')]]))
+                    await remove_handler(callback_query.from_user.id)
+
+            await add_handler(callback_query.from_user.id, wait)
+
+        elif data.startswith('clear_worker_proxy '):
+
+            session = data.split()[1]
+            sql_edit("UPDATE workers SET proxy = ? WHERE session = ?", (None, session))
+            await callback_query.message.edit(
+                '✅ Прокси убран. Будет использоваться общий прокси.',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('К аккаунту ◀️', callback_data=f'user {session}')]]))
+
         elif data == '+':
             sent = await callback_query.message.reply("Введите номер аккаунта:\n\n<i>/cancel для отмены</i>")
             
